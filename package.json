@@ -1,0 +1,25 @@
+{
+  "name": "wedding-website",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "prettier": "@ww/config/prettier",
+  "scripts": {
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,cjs,json}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,cjs,json}\""
+  },
+  "devDependencies": {
+    "@ww/config": "workspace:*",
+    "eslint": "^10.11.0",
+    "prettier": "^3.9.9",
+    "turbo": "^2.11.5",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
+  }
+}
