@@ -5,6 +5,12 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@ww/db", "@ww/env", "@ww/ui"],
   // Lint runs through turbo with the shared flat config.
   eslint: { ignoreDuringBuilds: true },
+  // Site pages take their CDN caching from ISR (`revalidate`), so only API routes are set here.
+  // A header set here overrides the route's own: API responses are never shared-cached, and a
+  // route that should be cacheable needs an explicit exception in this list.
+  async headers() {
+    return [{ source: "/api/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] }];
+  },
 };
 
 export default nextConfig;

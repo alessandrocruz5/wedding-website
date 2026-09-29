@@ -12,8 +12,16 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC for Vercel Remote Cache
     steps:
       - uses: actions/checkout@v4
+      # Short-lived Turborepo token via OIDC; no stored secret. Skipped until TURBO_TEAM is set.
+      - uses: vercel/setup-turborepo-remote-cache-action@v1.1.0
+        if: vars.TURBO_TEAM != ''
+        with:
+          team: ${{ vars.TURBO_TEAM }}
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -24,3 +32,5 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      # Same build Vercel runs; needs no env (DATABASE_URL etc. are read at runtime only).
+      - run: pnpm build
