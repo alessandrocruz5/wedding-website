@@ -41,6 +41,9 @@ const pglite: Backend = {
 const neon: Backend = {
   setup: async () => {
     const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+    pool.on("error", (error: Error) =>
+      console.error("[isolation test] idle pool client error", error),
+    );
     return { db: drizzleNeon(pool, { schema }), teardown: () => pool.end() };
   },
 };
@@ -155,6 +158,33 @@ function isolationSuite(backend: Backend) {
       owns_tables: false,
       can_escalate: false,
     });
+  });
+
+  it("holds exactly the planned table privileges, and only it may call the resolvers", async () => {
+    // Catalog check (not probes): any future accidental grant changes this matrix.
+    const { rows } = (await db.execute(sql`
+      select t.name || ':' || string_agg(p.priv, ',' order by p.priv) as grant
+      from unnest(array['sites', 'site_domains', 'site_theme', 'users', 'site_members']) as t(name)
+      cross join unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']) as p(priv)
+      where has_table_privilege(current_user, 'public.' || t.name, p.priv)
+      group by t.name order by t.name`)) as unknown as { rows: { grant: string }[] };
+    expect(rows.map((r) => r.grant)).toEqual([
+      "site_domains:SELECT",
+      "site_members:SELECT",
+      "site_theme:DELETE,INSERT,SELECT,UPDATE",
+      "sites:SELECT,UPDATE",
+      "users:SELECT",
+    ]);
+
+    const fns = (await db.execute(sql`
+      select f.sig, has_function_privilege(current_user, f.sig, 'EXECUTE') as app,
+             has_function_privilege('public', f.sig, 'EXECUTE') as public
+      from unnest(array['public.ww_resolve_site_by_host(text)', 'public.ww_resolve_site_by_slug(text)']) as f(sig)
+      order by f.sig`)) as unknown as { rows: { sig: string; app: boolean; public: boolean }[] };
+    expect(fns.rows).toEqual([
+      { sig: "public.ww_resolve_site_by_host(text)", app: true, public: false },
+      { sig: "public.ww_resolve_site_by_slug(text)", app: true, public: false },
+    ]);
   });
 
   it("each demo tenant sees exactly its own seeded rows", async () => {
