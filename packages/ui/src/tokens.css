@@ -1,0 +1,91 @@
+/*
+ * @ww/ui token layer — the design-system contract (names listed in src/token-contract.ts).
+ *
+ * Values are placeholders until the Claude Design import; the NAMES are the contract.
+ * Everything sits in `@layer base`, so per-site overrides emitted by <ThemeProvider>
+ * (unlayered) always win without specificity games.
+ *
+ * Mode: follows `prefers-color-scheme` unless an ancestor sets data-ww-mode="light|dark".
+ * Surface tokens flip per mode; brand tokens (primary, accent, fonts, radius…) do not.
+ */
+@layer base {
+  :root,
+  [data-ww-theme] {
+    color-scheme: light;
+
+    /* Surface — light */
+    --ww-color-background: oklch(0.99 0.004 85);
+    --ww-color-foreground: oklch(0.22 0.01 60);
+    --ww-color-surface: oklch(1 0 0);
+    --ww-color-surface-foreground: oklch(0.22 0.01 60);
+    --ww-color-muted: oklch(0.95 0.008 85);
+    --ww-color-muted-foreground: oklch(0.48 0.012 60);
+    --ww-color-border: oklch(0.9 0.01 85);
+    --ww-color-input: oklch(0.86 0.012 85);
+
+    /* Brand — both modes */
+    --ww-color-primary: oklch(0.5 0.08 30);
+    --ww-color-primary-foreground: oklch(0.98 0.005 85);
+    --ww-color-accent: oklch(0.78 0.09 80);
+    --ww-color-accent-foreground: oklch(0.22 0.01 60);
+    --ww-color-destructive: oklch(0.55 0.2 27);
+    --ww-color-destructive-foreground: oklch(0.98 0 0);
+    --ww-color-ring: var(--ww-color-primary);
+    --ww-font-body: ui-sans-serif, system-ui, sans-serif;
+    --ww-font-heading: ui-serif, Georgia, serif;
+    --ww-radius: 0.5rem;
+  }
+
+  /* Surface — dark (forced) */
+  :root:has([data-ww-mode="dark"]),
+  [data-ww-mode="dark"] {
+    color-scheme: dark;
+
+    --ww-color-background: oklch(0.17 0.008 60);
+    --ww-color-foreground: oklch(0.95 0.006 85);
+    --ww-color-surface: oklch(0.21 0.008 60);
+    --ww-color-surface-foreground: oklch(0.95 0.006 85);
+    --ww-color-muted: oklch(0.26 0.008 60);
+    --ww-color-muted-foreground: oklch(0.72 0.01 85);
+    --ww-color-border: oklch(0.3 0.008 60);
+    --ww-color-input: oklch(0.36 0.01 60);
+  }
+
+  /* Surface — dark (system preference, unless forced light) */
+  @media (prefers-color-scheme: dark) {
+    :root:not(:has([data-ww-mode="light"])),
+    [data-ww-theme]:not([data-ww-mode="light"]) {
+      color-scheme: dark;
+
+      --ww-color-background: oklch(0.17 0.008 60);
+      --ww-color-foreground: oklch(0.95 0.006 85);
+      --ww-color-surface: oklch(0.21 0.008 60);
+      --ww-color-surface-foreground: oklch(0.95 0.006 85);
+      --ww-color-muted: oklch(0.26 0.008 60);
+      --ww-color-muted-foreground: oklch(0.72 0.01 85);
+      --ww-color-border: oklch(0.3 0.008 60);
+      --ww-color-input: oklch(0.36 0.01 60);
+    }
+  }
+
+  /* Presets — brand tokens only, so they compose with either mode. */
+  [data-ww-preset="classic"] {
+    --ww-color-primary: oklch(0.42 0.07 260);
+    --ww-color-accent: oklch(0.8 0.1 85);
+    --ww-font-heading: Georgia, "Times New Roman", serif;
+    --ww-radius: 0.25rem;
+  }
+
+  [data-ww-preset="garden"] {
+    --ww-color-primary: oklch(0.5 0.08 145);
+    --ww-color-accent: oklch(0.82 0.07 20);
+    --ww-radius: 1rem;
+  }
+
+  [data-ww-preset="modern"] {
+    --ww-color-primary: oklch(0.55 0.15 250);
+    --ww-color-accent: oklch(0.85 0.12 190);
+    --ww-font-heading: ui-sans-serif, system-ui, sans-serif;
+    --ww-radius: 0;
+  }
+}

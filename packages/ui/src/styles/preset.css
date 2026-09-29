@@ -1,0 +1,66 @@
+/*
+ * @ww/ui Tailwind v4 preset. Import it AFTER tailwindcss in the app's global stylesheet:
+ *
+ *   @import "tailwindcss";
+ *   @import "@ww/ui/preset.css";
+ *
+ * `@theme inline` makes every utility read the live `--ww-*` variable, so per-site overrides
+ * from <ThemeProvider> reach `bg-primary`, `rounded-md`, `font-heading`, … with no rebuild.
+ */
+@import "../tokens.css";
+
+/* Workspace packages are symlinked under node_modules, which Tailwind never auto-scans. */
+@source "..";
+
+@custom-variant dark {
+  &:where([data-ww-mode="dark"], [data-ww-mode="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:not([data-ww-mode="light"], [data-ww-mode="light"] *)) {
+      @slot;
+    }
+  }
+}
+
+@theme inline {
+  --color-background: var(--ww-color-background);
+  --color-foreground: var(--ww-color-foreground);
+  --color-surface: var(--ww-color-surface);
+  --color-surface-foreground: var(--ww-color-surface-foreground);
+  --color-muted: var(--ww-color-muted);
+  --color-muted-foreground: var(--ww-color-muted-foreground);
+  --color-border: var(--ww-color-border);
+  --color-input: var(--ww-color-input);
+  --color-primary: var(--ww-color-primary);
+  --color-primary-foreground: var(--ww-color-primary-foreground);
+  --color-accent: var(--ww-color-accent);
+  --color-accent-foreground: var(--ww-color-accent-foreground);
+  --color-destructive: var(--ww-color-destructive);
+  --color-destructive-foreground: var(--ww-color-destructive-foreground);
+  --color-ring: var(--ww-color-ring);
+
+  --font-body: var(--ww-font-body);
+  --font-heading: var(--ww-font-heading);
+
+  --radius-sm: calc(var(--ww-radius) * 0.5);
+  --radius-md: var(--ww-radius);
+  --radius-lg: calc(var(--ww-radius) * 1.5);
+  --radius-xl: calc(var(--ww-radius) * 2);
+}
+
+@layer base {
+  body,
+  [data-ww-theme] {
+    background-color: var(--ww-color-background);
+    color: var(--ww-color-foreground);
+    font-family: var(--ww-font-body);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--ww-font-heading);
+  }
+}
