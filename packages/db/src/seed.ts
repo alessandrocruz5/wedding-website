@@ -88,8 +88,10 @@ export async function seedDemo(db: Database): Promise<void> {
 
 async function main() {
   const env = createEnv(migrateEnvSchema);
-  if (env.NODE_ENV === "production") {
-    throw new Error("Refusing to load demo data with NODE_ENV=production.");
+  if (env.NODE_ENV === "production" || process.env.ALLOW_DEMO_SEED !== "1") {
+    throw new Error(
+      "Refusing to load demo data: set ALLOW_DEMO_SEED=1 and point MIGRATE_DATABASE_URL at a dev branch.",
+    );
   }
   const db = createPoolDb(env.MIGRATE_DATABASE_URL);
   try {

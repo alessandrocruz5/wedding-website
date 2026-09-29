@@ -11,6 +11,8 @@ BEGIN
 END
 $$;
 --> statement-breakpoint
+-- Enforce attributes even if ww_app pre-existed (roles are cluster-wide, shared by branches).
+ALTER ROLE ww_app NOLOGIN NOBYPASSRLS NOCREATEROLE NOCREATEDB;--> statement-breakpoint
 
 -- '' (not NULL) is what a txn-local GUC reverts to after commit on a pooled connection.
 CREATE FUNCTION public.ww_current_site_id() RETURNS uuid
@@ -42,9 +44,10 @@ GRANT EXECUTE ON FUNCTION public.ww_resolve_site_by_slug(text) TO ww_app;--> sta
 
 GRANT USAGE ON SCHEMA public TO ww_app;--> statement-breakpoint
 GRANT SELECT, UPDATE ON public.sites TO ww_app;--> statement-breakpoint
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.site_domains, public.site_theme, public.site_members TO ww_app;--> statement-breakpoint
--- Identity writes belong to the auth layer (Sprint 4).
-GRANT SELECT ON public.users TO ww_app;--> statement-breakpoint
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.site_theme TO ww_app;--> statement-breakpoint
+-- Routing, membership and identity writes belong to the admin/auth layer (Sprint 4), which
+-- adds its own grants. The FOR ALL policies below already constrain them once granted.
+GRANT SELECT ON public.site_domains, public.site_members, public.users TO ww_app;--> statement-breakpoint
 
 ALTER TABLE public.sites ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE public.sites FORCE ROW LEVEL SECURITY;--> statement-breakpoint

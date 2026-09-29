@@ -32,9 +32,12 @@ const theme = await withSite(getPoolDb(), site.id, (tx) => tx.select().from(site
    Then set its password in the **Console** (Branch → Roles → `ww_app_login` → Reset password).
    A password set via SQL (`PASSWORD '…'` / `ALTER ROLE`) is rejected by Neon's proxy (`28P01`).
    Set `DATABASE_URL` to this role on the **pooled** (`-pooler`) host.
-5. `pnpm --filter @ww/db db:seed` (dev only; refuses `NODE_ENV=production`).
-6. `pnpm --filter @ww/db test` — the isolation suite now also runs live against Neon and
-   asserts the connection role is not superuser, cannot bypass RLS and owns no tables.
+5. `ALLOW_DEMO_SEED=1 pnpm --filter @ww/db db:seed` (dev branch only; explicit opt-in, and it
+   refuses `NODE_ENV=production`).
+6. `pnpm --filter @ww/db test` — reads `.env`, so the isolation suite also runs live against Neon
+   (otherwise that leg is reported as skipped). It asserts the connection role is not superuser,
+   cannot bypass RLS, owns no tables and cannot `SET ROLE` into anything that can. Every write
+   probe rolls back, so it is safe against a shared branch.
 
 ## Scripts
 
@@ -46,4 +49,8 @@ const theme = await withSite(getPoolDb(), site.id, (tx) => tx.select().from(site
 | `test`        | PGlite (+ Neon)        | Isolation suite; live leg runs when `DATABASE_URL` |
 
 New tenant tables must add their grants + policies in a migration; the app role gets no default
-privileges on purpose.
+privileges on purpose. Today `ww_app` may write only `site_theme` and update `sites`; routing,
+membership and identity writes arrive with the admin/auth layer (Sprint 4).
+
+⚠️ drizzle-kit does not see RLS, grants or policies (they live in hand-written SQL). A generated
+migration that drops and recreates a table silently loses them — re-add them in the same migration.

@@ -18,14 +18,12 @@ import {
 } from "../tenant";
 
 interface Backend {
-  name: string;
   /** Returns a db connected AS THE APP ROLE, against migrated + seeded data. */
   setup: () => Promise<{ db: Database; teardown: () => Promise<void> }>;
 }
 
 // Always runs (CI included): real migration files on in-process Postgres, then drop to ww_app.
 const pglite: Backend = {
-  name: "pglite",
   setup: async () => {
     const client = new PGlite();
     const db = drizzlePglite(client, { schema });
@@ -38,19 +36,19 @@ const pglite: Backend = {
   },
 };
 
-// Runs when DATABASE_URL (the app login role) is set against a migrated + seeded Neon branch.
+// Live leg: DATABASE_URL (the app login role) against a migrated + seeded Neon branch.
 // max: 1 forces every query onto one connection, so context leakage would be visible.
 const neon: Backend = {
-  name: "neon",
   setup: async () => {
     const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
     return { db: drizzleNeon(pool, { schema }), teardown: () => pool.end() };
   },
 };
 
-const backends = process.env.DATABASE_URL ? [pglite, neon] : [pglite];
-
 const [siteA, siteB] = DEMO_SITES;
+const ZERO = { sites: 0, siteDomains: 0, siteTheme: 0, users: 0, siteMembers: 0 };
+const RLS_VIOLATION = /row-level security/;
+const NO_GRANT = /permission denied for table/;
 
 async function countAll(q: Database | SiteTx) {
   const count = async (
@@ -65,9 +63,60 @@ async function countAll(q: Database | SiteTx) {
   };
 }
 
-const ZERO = { sites: 0, siteDomains: 0, siteTheme: 0, users: 0, siteMembers: 0 };
+/** Thrown at the end of every write probe so nothing is ever committed (the live branch is shared). */
+class Rollback extends Error {}
 
-describe.each(backends)("tenant isolation ($name)", (backend) => {
+function inTx(db: Database, siteId: string | null, body: (tx: SiteTx) => Promise<unknown>) {
+  return siteId ? withSite(db, siteId, body) : db.transaction(body);
+}
+
+/** Runs `fn` in a transaction that is always rolled back, returning its result. */
+async function rolledBack<T>(
+  db: Database,
+  siteId: string | null,
+  fn: (tx: SiteTx) => Promise<T>,
+): Promise<T> {
+  let result!: T;
+  await expect(
+    inTx(db, siteId, async (tx) => {
+      result = await fn(tx);
+      throw new Rollback();
+    }),
+  ).rejects.toBeInstanceOf(Rollback);
+  return result;
+}
+
+/** Drizzle wraps driver errors; the Postgres error (with `code`) is somewhere on the cause chain. */
+function pgError(error: unknown): { code?: string; message: string } {
+  let current = error as { code?: string; message?: string; cause?: unknown } | undefined;
+  while (current && !current.code && current.cause) {
+    current = current.cause as typeof current;
+  }
+  return { code: current?.code, message: current?.message ?? String(error) };
+}
+
+/** Asserts Postgres refused the write for `reason` — not a unique/FK clash or a Rollback. */
+async function expectDenied(
+  db: Database,
+  siteId: string | null,
+  write: (tx: SiteTx) => Promise<unknown>,
+  reason: RegExp,
+) {
+  const error = await inTx(db, siteId, async (tx) => {
+    await write(tx);
+    throw new Rollback();
+  }).then(
+    () => undefined,
+    (e: unknown) => e,
+  );
+  expect(error, "write was not refused").toBeDefined();
+  expect(error, "write succeeded (rolled back by the test)").not.toBeInstanceOf(Rollback);
+  const pg = pgError(error);
+  expect(pg.code).toBe("42501");
+  expect(pg.message).toMatch(reason);
+}
+
+function isolationSuite(backend: Backend) {
   let db: Database;
   let teardown: () => Promise<void>;
 
@@ -108,6 +157,19 @@ describe.each(backends)("tenant isolation ($name)", (backend) => {
     });
   });
 
+  it("each demo tenant sees exactly its own seeded rows", async () => {
+    for (const [i, site] of DEMO_SITES.entries()) {
+      const people = i < 2 ? 2 : 1; // owner (+ shared planner on the first two sites)
+      expect(await withSite(db, site.id, (tx) => countAll(tx)), site.slug).toEqual({
+        sites: 1,
+        siteDomains: site.hostnames.length,
+        siteTheme: 1,
+        users: people,
+        siteMembers: people,
+      });
+    }
+  });
+
   describe("no tenant context", () => {
     it("returns 0 rows from every tenant table", async () => {
       expect(await countAll(db)).toEqual(ZERO);
@@ -118,19 +180,22 @@ describe.each(backends)("tenant isolation ($name)", (backend) => {
     });
 
     it("cannot write", async () => {
-      await expect(
-        db.insert(siteDomains).values({ siteId: siteA.id, hostname: "no-context.example.com" }),
-      ).rejects.toThrow();
-      expect(await db.update(siteTheme).set({ preset: "hijacked" }).returning()).toHaveLength(0);
+      await expectDenied(
+        db,
+        null,
+        (tx) => tx.insert(siteTheme).values({ siteId: siteA.id }),
+        RLS_VIOLATION,
+      );
+      expect(
+        await rolledBack(db, null, (tx) =>
+          tx.update(siteTheme).set({ preset: "hijacked" }).returning(),
+        ),
+      ).toHaveLength(0);
     });
   });
 
   describe("within withSite(A)", () => {
     it("sees exactly A's rows", async () => {
-      const counts = await withSite(db, siteA.id, (tx) => countAll(tx));
-      // A: 1 site, 1 domain, 1 theme, owner + planner as members/users.
-      expect(counts).toEqual({ sites: 1, siteDomains: 1, siteTheme: 1, users: 2, siteMembers: 2 });
-
       const seen = await withSite(db, siteA.id, async (tx) => ({
         sites: (await tx.select({ id: sites.id }).from(sites)).map((r) => r.id),
         domainSites: (await tx.select({ id: siteDomains.siteId }).from(siteDomains)).map(
@@ -163,56 +228,90 @@ describe.each(backends)("tenant isolation ($name)", (backend) => {
       expect(memberships.map((m) => m.siteId)).toEqual([siteA.id]);
     });
 
-    it("cannot insert, update or delete B's rows (cross-tenant write)", async () => {
-      await expect(
-        withSite(db, siteA.id, (tx) =>
-          tx.insert(siteDomains).values({ siteId: siteB.id, hostname: "cross-tenant.example.com" }),
-        ),
-      ).rejects.toThrow();
-      await expect(
-        withSite(db, siteA.id, (tx) =>
-          tx
-            .insert(siteMembers)
-            .values({ siteId: siteB.id, userId: siteA.owner.id, role: "owner" }),
-        ),
-      ).rejects.toThrow();
-      await expect(
-        withSite(db, siteA.id, (tx) =>
-          tx.update(siteDomains).set({ siteId: siteB.id }).where(eq(siteDomains.siteId, siteA.id)),
-        ),
-      ).rejects.toThrow();
+    it("RLS refuses writes that would create or move rows out of A", async () => {
+      await expectDenied(
+        db,
+        siteA.id,
+        (tx) => tx.insert(siteTheme).values({ siteId: siteB.id }),
+        RLS_VIOLATION,
+      );
+      // No WHERE: a WHERE would also apply the SELECT policy to the new row and mask WITH CHECK.
+      await expectDenied(
+        db,
+        siteA.id,
+        (tx) => tx.update(siteTheme).set({ siteId: siteB.id }),
+        RLS_VIOLATION,
+      );
+      await expectDenied(
+        db,
+        siteA.id,
+        (tx) => tx.update(sites).set({ id: "5a1e0000-0000-4000-8000-0000000000ff" }),
+        RLS_VIOLATION,
+      );
+    });
 
-      const affected = await withSite(db, siteA.id, async (tx) => ({
+    it("updates and deletes aimed at B affect 0 rows", async () => {
+      const affected = await rolledBack(db, siteA.id, async (tx) => ({
         sites: (
           await tx.update(sites).set({ name: "hijacked" }).where(eq(sites.id, siteB.id)).returning()
         ).length,
-        siteTheme: (
+        siteThemeUpdated: (
           await tx
             .update(siteTheme)
             .set({ preset: "hijacked" })
             .where(eq(siteTheme.siteId, siteB.id))
             .returning()
         ).length,
-        siteDomains: (
-          await tx.delete(siteDomains).where(eq(siteDomains.siteId, siteB.id)).returning()
-        ).length,
-        siteMembers: (
-          await tx.delete(siteMembers).where(eq(siteMembers.siteId, siteB.id)).returning()
+        siteThemeDeleted: (
+          await tx.delete(siteTheme).where(eq(siteTheme.siteId, siteB.id)).returning()
         ).length,
       }));
-      expect(affected).toEqual({ sites: 0, siteTheme: 0, siteDomains: 0, siteMembers: 0 });
+      expect(affected).toEqual({ sites: 0, siteThemeUpdated: 0, siteThemeDeleted: 0 });
     });
 
     it("scopes a blanket UPDATE (no WHERE, so only the UPDATE policy applies) to A", async () => {
-      class Rollback extends Error {}
-      // Touching B would violate RLS instead of reaching our Rollback; rolled back either way.
-      await expect(
-        withSite(db, siteA.id, async (tx) => {
-          await tx.update(sites).set({ updatedAt: new Date(0) });
-          await tx.update(siteTheme).set({ updatedAt: new Date(0) });
-          throw new Rollback();
-        }),
-      ).rejects.toBeInstanceOf(Rollback);
+      const epoch = new Date(0);
+      const bAfter = await rolledBack(db, siteA.id, async (tx) => {
+        await tx.update(sites).set({ updatedAt: epoch });
+        await tx.update(siteTheme).set({ updatedAt: epoch });
+        // Peek at B inside the same (rolled-back) transaction.
+        await tx.execute(sql`select set_config('app.site_id', ${siteB.id}, true)`);
+        return {
+          site: (await tx.select({ at: sites.updatedAt }).from(sites))[0]?.at.getTime(),
+          theme: (await tx.select({ at: siteTheme.updatedAt }).from(siteTheme))[0]?.at.getTime(),
+        };
+      });
+      expect(bAfter.site).toBeDefined();
+      expect(bAfter.site).not.toBe(0);
+      expect(bAfter.theme).toBeDefined();
+      expect(bAfter.theme).not.toBe(0);
+    });
+
+    it("has no write grant on routing, membership or identity tables", async () => {
+      await expectDenied(
+        db,
+        siteA.id,
+        (tx) => tx.insert(siteDomains).values({ siteId: siteA.id, hostname: "new.example.com" }),
+        NO_GRANT,
+      );
+      await expectDenied(
+        db,
+        siteA.id,
+        (tx) => tx.insert(siteMembers).values({ siteId: siteA.id, userId: siteB.owner.id }),
+        NO_GRANT,
+      );
+      await expectDenied(
+        db,
+        siteA.id,
+        (tx) => tx.delete(siteMembers).where(eq(siteMembers.siteId, siteA.id)),
+        NO_GRANT,
+      );
+      await expectDenied(
+        db,
+        siteA.id,
+        (tx) => tx.update(users).set({ name: "hijacked" }),
+        NO_GRANT,
+      );
     });
   });
 
@@ -228,6 +327,22 @@ describe.each(backends)("tenant isolation ($name)", (backend) => {
       }),
     ).rejects.toThrow("boom");
     expect(await countAll(db)).toEqual(ZERO);
+  });
+
+  it("refuses to switch tenant inside a running withSite (nested call)", async () => {
+    // A nested savepoint's set_config survives RELEASE, so a nested switch would silently
+    // re-scope the rest of the outer callback to B.
+    await expect(
+      withSite(db, siteA.id, async (tx) => {
+        await withSite(tx, siteB.id, async () => undefined);
+        return tx.select().from(sites);
+      }),
+    ).rejects.toThrow(/already scoped/);
+    // Re-entering the same tenant is harmless and allowed.
+    const rows = await withSite(db, siteA.id, (tx) =>
+      withSite(tx, siteA.id.toUpperCase(), (inner) => inner.select({ id: sites.id }).from(sites)),
+    );
+    expect(rows).toEqual([{ id: siteA.id }]);
   });
 
   it("rejects a non-UUID site id before touching the database", async () => {
@@ -256,4 +371,11 @@ describe.each(backends)("tenant isolation ($name)", (backend) => {
       expect(await resolveSiteBySlug(db, "nobody")).toBeNull();
     });
   });
-});
+}
+
+describe("tenant isolation (pglite)", () => isolationSuite(pglite));
+
+describe.skipIf(!process.env.DATABASE_URL)(
+  "tenant isolation (neon — skipped unless DATABASE_URL is set)",
+  () => isolationSuite(neon),
+);
