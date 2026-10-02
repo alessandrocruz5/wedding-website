@@ -17,14 +17,15 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const site = await getSite((await params).siteKey);
-  return site ? { title: site.name } : {};
+  return site ? { title: { default: site.name, template: `%s · ${site.name}` } } : {};
 }
 
 export default async function SiteLayout({ children, params }: Props) {
   const site = await getSite((await params).siteKey);
   if (!site) notFound();
   return (
-    <ThemeProvider preset={site.theme.preset} tokens={site.theme.tokens}>
+    // Light only: the Arc & Hearth design has no dark mode (WW-3).
+    <ThemeProvider preset={site.theme.preset} tokens={site.theme.tokens} mode="light">
       <div className="min-h-dvh">{children}</div>
     </ThemeProvider>
   );

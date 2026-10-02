@@ -80,7 +80,23 @@ describe("tailwind preset", () => {
     expect(css).toContain('.dark\\:bg-surface:where([data-ww-mode="dark"]');
     // The token layer ships with the preset, inside a cascade layer.
     expect(css).toMatch(/@layer base\s*{\s*:root,\s*\[data-ww-theme\]/);
-    // Workspace primitives are scanned even though they live under node_modules in the app.
+    // Workspace components are scanned even though they live under node_modules in the app.
     expect(compiler.sources).toContainEqual(expect.objectContaining({ pattern: ".." }));
+  });
+
+  it("ships the design layer: fixed palette plus utilities derived from the contract", async () => {
+    const compiler = await compile(`@import "tailwindcss";\n@import "@ww/ui/preset.css";`, {
+      base: srcDir,
+      onDependency: () => {},
+    });
+    const css = compiler.build(["bg-calm", "bg-primary-soft", "rounded-card", "rounded-dome"]);
+
+    // Static palette: emitted as variables even when unused, for inline styles.
+    expect(css).toMatch(/--color-clay-bright:\s*#b0664a/);
+    expect(css).toMatch(/\.bg-calm\s*{\s*background-color: var\(--color-calm\)/);
+    // Derived utilities carry the expression, so they follow presets and per-site overrides.
+    expect(css).toMatch(/\.bg-primary-soft\s*{[^}]*color-mix\(in oklab, var\(--ww-color-primary\)/);
+    expect(css).toMatch(/\.rounded-card\s*{\s*border-radius: calc\(var\(--ww-radius\) \* 1\.75\)/);
+    expect(css).toMatch(/\.rounded-dome\s*{\s*border-radius: var\(--radius-dome\)/);
   });
 });

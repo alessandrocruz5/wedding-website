@@ -1,8 +1,8 @@
 # @ww/ui
 
-Theming seam and design-system token contract: a Tailwind v4 preset, a CSS-variable token
-layer (light + dark), a server-rendered `<ThemeProvider>` for per-site overrides, and three
-**disposable** primitives (`Button`, `Card`, `Input`) that exist only to prove the seam.
+Theming seam, design-system token contract and the **Arc & Hearth** components (Claude Design
+import, WW-3): a Tailwind v4 preset, a CSS-variable token layer, a fixed design layer, a
+server-rendered `<ThemeProvider>` for per-site overrides, and the site's components.
 
 ## Wiring it into an app
 
@@ -29,12 +29,17 @@ return (
 - `mode` is `"system"` by default (`prefers-color-scheme`). Pass `"light"`/`"dark"` to force one,
   also without client JS.
 - The package ships TypeScript source (no build step). The consuming Next.js app must list it in
-  `transpilePackages: ["@ww/ui"]`.
+  `transpilePackages: ["@ww/ui"]` and `experimental.optimizePackageImports: ["@ww/ui"]`. Without
+  the latter, every page that imports from the barrel ships the client-side RSVP form.
+- Fonts: the default `font-body`/`font-heading` read `--font-jost`/`--font-cormorant`, which the
+  app defines with `next/font/google` (self-hosted, so guest pages make no Google requests).
+- Wedding sites render `mode="light"`: the design has no dark mode, so the dark surface values in
+  `tokens.css` are still the WW-6 placeholders.
 
 ## The token contract
 
 Every token is a CSS variable `--ww-<name>`. The **names** are the contract that the Claude
-Design import must satisfy. The **values** in `src/tokens.css` are placeholders. The canonical
+Design import must satisfy. The light **values** in `src/tokens.css` are the Arc & Hearth design; presets may change brand tokens. The canonical
 list is `TOKEN_NAMES` in `src/token-contract.ts`, and the test suite fails if `tokens.css` or
 `preset.css` drift from it.
 
@@ -84,9 +89,30 @@ dark-mode value.
   color functions, `color-mix`, `var`, `calc`, `min`, `max` and `clamp`. There is **no `url()`**,
   so a theme can never load third-party resources on a guest page.
 
-## Replacing the primitives
+## Design layer (`src/styles/design.css`)
 
-`Button`, `Card` and `Input` are placeholders. The design import may delete or replace them
-freely, as long as its components style themselves through the utilities above (or the
-`--ww-*` variables directly). The contract lives in `token-contract.ts`, `tokens.css` and
-`preset.css`, not in the primitives.
+The Arc & Hearth extras on top of the contract. They are **not** part of it and cannot be set
+through `site_theme.tokens`.
+
+- **Fixed earth palette** (`@theme static`, also available as `--color-*` vars for inline styles):
+  `calm`, `calm-strong`, `calm-foreground` (sage bands), `inverse`, `inverse-foreground`,
+  `inverse-muted` (bark footer), `ink-soft` (secondary text), `ochre`, `ochre-foreground`,
+  `clay-soft`, `clay-light`, `ornament`, `clay-bright`. Also bark-tinted `shadow-sm/md/lg`, the
+  type scale (`text-display-xl` … `text-eyebrow`), `tracking-*`, `ease-arc`,
+  `max-w-content/text/form`, and the fixed arch shapes `rounded-arch`, `rounded-arch-soft` and
+  `rounded-dome`.
+- **Derived from the contract** (`@theme inline`, resolved per element so presets and overrides
+  reach them): `primary-hover`, `primary-soft`, `focus` (the 4px halo), and `rounded-card`,
+  `rounded-panel`, `rounded-check`, `rounded-form` as multiples of `--ww-radius`.
+
+## Components
+
+Server components unless noted. They style themselves only through the utilities above.
+
+- **Core:** `Button` (+ `buttonClasses()` for links), `Badge`, `Card`, `SectionHeading`, `Names`
+  (wordmark), and `Accordion` (native exclusive `<details name>`, no JS).
+- **Arcs:** `ArchFrame` (image or striped placeholder in arch shapes) and `ArcDivider`.
+- **Forms** (client): `Field`, `TextField`, `SelectField`, `ChoiceGroup`, `Checkbox`, `Stepper`.
+- **RSVP:** `StepArc`, plus `RsvpForm` (client). Without **both** `onLookup` and `onSubmit` it
+  renders closed and collects nothing. Unlike the design kit, there is no demo fallback. Sprint 3
+  wires the handlers.

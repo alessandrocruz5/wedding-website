@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   decideRoute,
   normalizeHost,
+  siteBasePath,
   siteLookups,
   subdomainSlug,
   type TenantConfig,
@@ -200,6 +201,34 @@ describe("siteLookups", () => {
       if (d.kind !== "site") throw new Error("expected a site route");
       expect(siteLookups(d.key, multi.rootDomain)).not.toBeNull();
     }
+  });
+});
+
+describe("siteBasePath", () => {
+  it("keeps the /s/{slug} prefix for slug routing on the platform host", () => {
+    expect(siteBasePath("s.ana-and-ben", multi)).toBe("/s/ana-and-ben");
+  });
+
+  it("serves hosts and pinned deploys at the root", () => {
+    expect(siteBasePath("h.ana-and-ben.weddings.test", multi)).toBe("");
+    expect(siteBasePath("h.eliandfaye.example.com", multi)).toBe("");
+    expect(siteBasePath("s.carla-and-dan", pinned)).toBe("");
+  });
+
+  it.each([
+    ["weddings.test", "/s/ana-and-ben", multi],
+    ["ana-and-ben.weddings.test", "/", multi],
+    ["eliandfaye.example.com", "/", multi],
+    ["anything.example", "/", pinned],
+  ] as const)("links from %s%s route back to the same site", (host, path, config) => {
+    const home = decideRoute(host, path, config);
+    if (home.kind !== "site") throw new Error("expected a site route");
+    const link = `${siteBasePath(home.key, config)}/schedule`;
+    expect(decideRoute(host, link, config)).toEqual({
+      kind: "site",
+      key: home.key,
+      path: `/sites/${home.key}/schedule`,
+    });
   });
 });
 
