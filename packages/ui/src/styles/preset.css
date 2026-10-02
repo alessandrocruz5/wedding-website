@@ -8,6 +8,8 @@
  * from <ThemeProvider> reach `bg-primary`, `rounded-md`, `font-heading`, … with no rebuild.
  */
 @import "../tokens.css";
+/* Arc & Hearth design layer: fixed palette and contract-derived utilities (not overridable). */
+@import "./design.css";
 
 /* Workspace packages are symlinked under node_modules, which Tailwind never auto-scans. */
 @source "..";

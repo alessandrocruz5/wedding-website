@@ -114,6 +114,15 @@ export function decideRoute(
   return { kind: "pass" };
 }
 
+/**
+ * Prefix for a site's own links, from its key. Unpinned, an `s.` key only comes from `/s/{slug}`
+ * on the platform host, so links keep that prefix. Hosts and pinned deploys serve the site at `/`.
+ */
+export function siteBasePath(key: string, config: TenantConfig): string {
+  if (config.singleTenantSlug || !key.startsWith("s.")) return "";
+  return `/${PATH_PREFIX}/${key.slice(2)}`;
+}
+
 export type SiteLookup = { by: "host"; hostname: string } | { by: "slug"; slug: string };
 
 /**
