@@ -11,8 +11,9 @@ import {
 } from "@ww/db";
 import { eq } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
+import { notFound } from "next/navigation";
 import { cache } from "react";
-import { siteLookups } from "./resolve-host";
+import { siteBasePath, siteLookups } from "./resolve-host";
 import { getTenantConfig } from "./tenant-context";
 
 export interface Site {
@@ -67,3 +68,15 @@ const loadSiteCached = unstable_cache(loadSite, ["ww-site-by-key"], {
 
 /** Site + theme for a middleware site key. Deduped per request, cached across requests. */
 export const getSite = cache((key: string): Promise<Site | null> => loadSiteCached(key));
+
+export interface SitePageProps {
+  params: Promise<{ siteKey: string }>;
+}
+
+/** Page-side load: the site (404 if unknown) and the prefix its own links need. */
+export async function requireSite(params: SitePageProps["params"]) {
+  const key = (await params).siteKey;
+  const site = await getSite(key);
+  if (!site) notFound();
+  return { site, base: siteBasePath(key, getTenantConfig()) };
+}

@@ -1,7 +1,8 @@
 /*
  * @ww/ui token layer — the design-system contract (names listed in src/token-contract.ts).
  *
- * Values are placeholders until the Claude Design import; the NAMES are the contract.
+ * Light values are the Arc & Hearth design (Claude Design import, WW-3); the NAMES are the
+ * contract. Wedding sites render light only (WW-3), so the dark values are still placeholders.
  * Everything sits in `@layer base`, so per-site overrides emitted by <ThemeProvider>
  * (unlayered) always win without specificity games.
  *
@@ -13,27 +14,28 @@
   [data-ww-theme] {
     color-scheme: light;
 
-    /* Surface — light */
-    --ww-color-background: oklch(0.99 0.004 85);
-    --ww-color-foreground: oklch(0.22 0.01 60);
-    --ww-color-surface: oklch(1 0 0);
-    --ww-color-surface-foreground: oklch(0.22 0.01 60);
-    --ww-color-muted: oklch(0.95 0.008 85);
-    --ww-color-muted-foreground: oklch(0.48 0.012 60);
-    --ww-color-border: oklch(0.9 0.01 85);
-    --ww-color-input: oklch(0.86 0.012 85);
+    /* Surface — light (linen & sand) */
+    --ww-color-background: #f5efe6;
+    --ww-color-foreground: #2e241f;
+    --ww-color-surface: #fbf8f3;
+    --ww-color-surface-foreground: #2e241f;
+    --ww-color-muted: #eadfcf;
+    --ww-color-muted-foreground: #7a6557;
+    --ww-color-border: #dccbb3;
+    --ww-color-input: #c7b295;
 
-    /* Brand — both modes */
-    --ww-color-primary: oklch(0.5 0.08 30);
-    --ww-color-primary-foreground: oklch(0.98 0.005 85);
-    --ww-color-accent: oklch(0.78 0.09 80);
-    --ww-color-accent-foreground: oklch(0.22 0.01 60);
-    --ww-color-destructive: oklch(0.55 0.2 27);
-    --ww-color-destructive-foreground: oklch(0.98 0 0);
+    /* Brand — both modes (clay action, sage accent) */
+    --ww-color-primary: #92503a;
+    --ww-color-primary-foreground: #fbf8f3;
+    --ww-color-accent: #535e45;
+    --ww-color-accent-foreground: #fbf8f3;
+    --ww-color-destructive: #a2412f;
+    --ww-color-destructive-foreground: #fbf8f3;
     --ww-color-ring: var(--ww-color-primary);
-    --ww-font-body: ui-sans-serif, system-ui, sans-serif;
-    --ww-font-heading: ui-serif, Georgia, serif;
-    --ww-radius: 0.5rem;
+    /* --font-jost / --font-cormorant are set by the app's next/font loaders (self-hosted). */
+    --ww-font-body: var(--font-jost, "Jost"), "Futura", "Avenir Next", system-ui, sans-serif;
+    --ww-font-heading: var(--font-cormorant, "Cormorant Garamond"), Georgia, serif;
+    --ww-radius: 16px;
   }
 
   /* Surface — dark (forced) */
@@ -68,10 +70,12 @@
     }
   }
 
-  /* Presets — brand tokens only, so they compose with either mode. */
+  /* Presets — brand tokens only, so they compose with either mode. Their accents are light, so
+     each pins a dark accent foreground (the default's sage accent takes linen). */
   [data-ww-preset="classic"] {
     --ww-color-primary: oklch(0.42 0.07 260);
     --ww-color-accent: oklch(0.8 0.1 85);
+    --ww-color-accent-foreground: oklch(0.22 0.01 60);
     --ww-font-heading: Georgia, "Times New Roman", serif;
     --ww-radius: 0.25rem;
   }
@@ -79,12 +83,14 @@
   [data-ww-preset="garden"] {
     --ww-color-primary: oklch(0.5 0.08 145);
     --ww-color-accent: oklch(0.82 0.07 20);
+    --ww-color-accent-foreground: oklch(0.22 0.01 60);
     --ww-radius: 1rem;
   }
 
   [data-ww-preset="modern"] {
     --ww-color-primary: oklch(0.55 0.15 250);
     --ww-color-accent: oklch(0.85 0.12 190);
+    --ww-color-accent-foreground: oklch(0.22 0.01 60);
     --ww-font-heading: ui-sans-serif, system-ui, sans-serif;
     --ww-radius: 0;
   }

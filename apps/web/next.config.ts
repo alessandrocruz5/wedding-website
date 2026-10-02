@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Workspace packages ship TypeScript source, not builds.
   transpilePackages: ["@ww/db", "@ww/env", "@ww/ui"],
+  // @ww/ui's barrel re-exports client components (the RSVP form); without this every page that
+  // imports anything from it would ship them.
+  experimental: { optimizePackageImports: ["@ww/ui"] },
   // Lint runs through turbo with the shared flat config.
   eslint: { ignoreDuringBuilds: true },
   // Site pages take their CDN caching from ISR (`revalidate`), so only API routes are set here.

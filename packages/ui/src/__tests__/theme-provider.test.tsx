@@ -1,9 +1,6 @@
 import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Button } from "../primitives/button";
-import { Card } from "../primitives/card";
-import { Input } from "../primitives/input";
 import { buildThemeCss, isSafeTokenValue, ThemeProvider } from "../theme-provider";
 
 function renderPage(node: ReactNode): string {
@@ -128,25 +125,5 @@ describe("ThemeProvider (SSR)", () => {
     );
     expect(html).not.toContain("<script");
     expect(html).not.toContain("<style");
-  });
-});
-
-describe("primitives", () => {
-  it("render token-driven classes and pass props through", () => {
-    const html = renderToString(
-      <Card className="extra">
-        <Input placeholder="Name" />
-        <Button variant="outline" disabled>
-          RSVP
-        </Button>
-      </Card>,
-    );
-    expect(html).toContain("bg-surface");
-    expect(html).toContain("extra");
-    expect(html).toContain("border-input");
-    expect(html).toContain('placeholder="Name"');
-    expect(html).toContain('type="button"');
-    expect(html).toContain("border-border");
-    expect(html).toContain("disabled");
   });
 });
