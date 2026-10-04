@@ -70,27 +70,25 @@
     }
   }
 
-  /* Presets — brand tokens only, so they compose with either mode. Their accents are light, so
-     each pins a dark accent foreground (the default's sage accent takes linen). */
+  /* Presets — brand tokens only, so they compose with either mode. Each is an earth-tone variant of
+     the default with a DARK accent: the accent foreground stays linen and the inverse eyebrow
+     (--color-clay-light) keeps AA contrast on it (asserted in token-contract.test.ts). */
   [data-ww-preset="classic"] {
-    --ww-color-primary: oklch(0.42 0.07 260);
-    --ww-color-accent: oklch(0.8 0.1 85);
-    --ww-color-accent-foreground: oklch(0.22 0.01 60);
+    --ww-color-primary: oklch(0.4 0.07 45); /* walnut */
+    --ww-color-accent: oklch(0.3 0.04 80); /* umber */
     --ww-font-heading: Georgia, "Times New Roman", serif;
     --ww-radius: 0.25rem;
   }
 
   [data-ww-preset="garden"] {
-    --ww-color-primary: oklch(0.5 0.08 145);
-    --ww-color-accent: oklch(0.82 0.07 20);
-    --ww-color-accent-foreground: oklch(0.22 0.01 60);
-    --ww-radius: 1rem;
+    --ww-color-primary: oklch(0.45 0.08 140); /* moss */
+    --ww-color-accent: oklch(0.36 0.07 25); /* dried rose */
+    --ww-radius: 1.5rem;
   }
 
   [data-ww-preset="modern"] {
-    --ww-color-primary: oklch(0.55 0.15 250);
-    --ww-color-accent: oklch(0.85 0.12 190);
-    --ww-color-accent-foreground: oklch(0.22 0.01 60);
+    --ww-color-primary: oklch(0.42 0.07 215); /* deep teal */
+    --ww-color-accent: oklch(0.3 0.03 260); /* slate */
     --ww-font-heading: ui-sans-serif, system-ui, sans-serif;
     --ww-radius: 0;
   }
