@@ -4,6 +4,35 @@ Status: [ ] planned · [~] in progress · [x] merged · [-] cancelled (excluded 
 > Keys below are placeholders (`WW-?n`). Replace each with the real Jira key once the Epic
 > and its children exist in project **WW**.
 
+## Sprint 2 — Portfolio showcase readiness   (planned 2026-10-04)
+Epic: WW-9
+
+**Locked decisions** (approved 2026-10-04 — do not re-litigate)
+- Portfolio showcase, free tiers only: Vercel Hobby + Neon free. `ROOT_DOMAIN` = the project's
+  production `*.vercel.app` alias; no domain purchase. Demos are served by path (`/s/{slug}`);
+  live subdomain routing is a later DNS + env change, no code.
+- Production Neon branch `prod` holds the demo seed only, until a real client exists. Seed runs
+  locally (`ALLOW_DEMO_SEED=1`); `MIGRATE_DATABASE_URL` is still never set in Vercel.
+- No schema changes this sprint. Per-site content stays on `content/placeholder.ts` (content model
+  is Sprint 3). No guest PII; RSVP stays closed.
+- License: MIT.
+- Ships v0.2.0 (MINOR) when all 4 units merge.
+
+**Audit baseline (2026-10-04, `main` @ a59360c):** lint/typecheck/156 tests green (incl. 40 live
+Neon isolation tests); `next build` clean; local prod smoke against Neon `dev`: all 3 demo sites ×
+4 pages = 200, subdomain + custom-domain hosts resolve, 404s correct. Gaps: not deployed (Vercel CLI
+not logged in; `wedding-website.vercel.app` is someone else's project), apex `/` 404s, demo sites
+look identical, no favicon/OG/robots/sitemap, README stale, `apps/web/.gitignore` (`.vercel`) untracked.
+
+- [ ] WW-10 — Production deploy on Vercel + Neon · Added · files: apps/web/.gitignore, infra/README.md, docs/runbook.md, TASKS.md (close WW-8 open tasks) · depends: — · ⚠️ high-stakes (prod credentials / DB role) → code-guardian
+  - Neon `prod` branch: migrations + demo seed + `ww_app_login` (password set in Console, not SQL — `28P01`). Vercel Production env: `DATABASE_URL` (app role, pooled), `ROOT_DOMAIN` = prod alias. Preview stays pinned `SINGLE_TENANT_SLUG=ana-and-ben` on `preview`. Runbook gate: prod `DATABASE_URL` absent from Preview; `MIGRATE_DATABASE_URL` absent everywhere.
+- [ ] WW-11 — Platform landing page at `/` + site metadata · Added · files: apps/web/app/page.tsx (new), apps/web/app/layout.tsx, apps/web/app/{icon.svg,opengraph-image.*,robots.ts,sitemap.ts} (new), apps/web/middleware.ts, apps/web/src/lib/__tests__/resolve-host.test.ts · depends: —
+  - ⚠️ Middleware matcher only excludes `favicon.ico|robots.txt|sitemap.xml`; new icon/OG routes would be rewritten into tenant routes and 404 on tenant hosts. Extend the matcher + tests. `decideRoute` already returns `pass` for platform-host `/`.
+- [ ] WW-12 — Demo tenant polish · Changed · files: packages/ui/src/tokens.css, packages/ui/src/styles/design.css, packages/ui/src/__tests__/token-contract.test.ts, apps/web/src/components/site-chrome.tsx, apps/web/src/lib/tenant-context.ts, apps/web/.env.example, apps/web/src/content/placeholder.ts · depends: —
+  - Re-tune `classic`/`garden`/`modern` (CSS only, no seed/DB change) so the 3 demos are distinct; AA contrast for inverse eyebrow; `SHOWCASE_MODE=1` demo banner linking to `/`; sample `bookingUrl`; nav ≤2 rows at 390px. Clears WW-3's follow-ups.
+- [ ] WW-13 — Portfolio README + repo presentation · Changed · files: README.md, LICENSE (new, MIT), docs/screenshots/* (new) · depends: WW-10, WW-11, WW-12
+  - Live link, screenshots, Mermaid architecture, key decisions, all 5 packages, local setup. Hand the owner the `gh repo edit` command (homepage + topics); don't run it.
+
 ## Sprint 1 — Whitelabel wedding site skeleton on Vercel   (planned 2026-09-28)
 Epic: WW-?E
 
@@ -69,7 +98,9 @@ Epic: WW-?E
 - [x] WW-hotfix — Untrack committed `packages/*/node_modules` · Fixed · files: packages/{config,db,env}/node_modules/** (47 files removed from the index) · depends: — · (committed 2026-10-02 straight to `develop`, ships in v0.1.0) `.gitignore` was already fixed in 3430de4 (unanchored `node_modules`), but files that were already tracked stayed tracked. Caused the junk-only PR #5. No Jira key yet.
 
 ## Backlog — future sprints (not planned in detail)
-- Sprint 2 — Content model + public pages (story, schedule, venue/travel, FAQ, registry links) on the imported design system.
-- Sprint 3 — Guest + RSVP: invite codes, party-level RSVP, meals/dietary, plus-ones, confirmation email, rate limiting. Carries the guest-PII constraints.
-- Sprint 4 — Admin: Auth.js v5, membership-scoped authorization, site/theme editing, guest list CRUD + CSV import, RSVP export. ⚠️ high-stakes (auth).
-- Sprint 5 — Media: signed uploads + gallery (storage vendor TBD).
+> Renumbered 2026-10-04 when Sprint 2 became the portfolio showcase. "Sprint 2/3/4/5" in the
+> Sprint 1 and WW-3 entries above refer to what is now Sprint 3/4/5/6.
+- Sprint 3 — Content model + public pages (story, schedule, venue/travel, FAQ, registry links) on the imported design system.
+- Sprint 4 — Guest + RSVP: invite codes, party-level RSVP, meals/dietary, plus-ones, confirmation email, rate limiting. Carries the guest-PII constraints.
+- Sprint 5 — Admin: Auth.js v5, membership-scoped authorization, site/theme editing, guest list CRUD + CSV import, RSVP export. ⚠️ high-stakes (auth).
+- Sprint 6 — Media: signed uploads + gallery (storage vendor TBD).
