@@ -5,16 +5,16 @@ domains) are in [docs/runbook.md](../docs/runbook.md).
 
 ## Topology
 
-| Piece          | Where                                                                                                                |
-| -------------- | -------------------------------------------------------------------------------------------------------------------- |
-| App            | One Vercel project, **Root Directory `apps/web`**. Functions in `sin1` (Singapore); Edge middleware runs globally.   |
-| Build config   | [`apps/web/vercel.json`](../apps/web/vercel.json). Vercel reads it from the Root Directory, not the repo root.       |
-| Database       | One Neon project in `aws-ap-southeast-1` (same metro as `sin1`).                                                     |
-| Neon branches  | `main` = production · `dev` = local development · `preview` = child of `dev`, shared by every Vercel preview deploy. |
-| Build cache    | Vercel Remote Cache (Turborepo), shared by Vercel builds, CI and local.                                              |
-| Deploy trigger | Vercel's Git integration: every pushed branch → Preview, `main` → Production.                                        |
+| Piece          | Where                                                                                                                        |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| App            | One Vercel project, **Root Directory `apps/web`**. Functions in `sin1` (Singapore); Edge middleware runs globally.           |
+| Build config   | [`apps/web/vercel.json`](../apps/web/vercel.json). Vercel reads it from the Root Directory, not the repo root.               |
+| Database       | One Neon project in `aws-ap-southeast-1` (same metro as `sin1`).                                                             |
+| Neon branches  | `production` (root) · `develop` = local development · `preview` = child of `develop`, shared by every Vercel preview deploy. |
+| Build cache    | Vercel Remote Cache (Turborepo), shared by Vercel builds, CI and local.                                                      |
+| Deploy trigger | Vercel's Git integration: every pushed branch → Preview, `main` → Production.                                                |
 
-The production branch `main` is the project's root branch. It holds **demo data only** until
+The Neon branch `production` is the project's root branch. It holds **demo data only** until
 the first real client (see the runbook's
 [Production database](../docs/runbook.md#production-database-demo-data)).
 
@@ -23,12 +23,12 @@ the first real client (see the runbook's
 Set in Vercel → Project → Settings → Environment Variables. **Each row is a separate entry per
 environment.** Never add one entry that targets both Production and Preview.
 
-| Variable               | Production                         | Preview                               | Development (local `apps/web/.env.local`) |
-| ---------------------- | ---------------------------------- | ------------------------------------- | ----------------------------------------- |
-| `DATABASE_URL`         | `ww_app_login` @ `main` **pooler** | `ww_app_login` @ `preview` **pooler** | `ww_app_login` @ `dev` pooler             |
-| `ROOT_DOMAIN`          | `<ROOT_DOMAIN>`                    | `<ROOT_DOMAIN>` (unused while pinned) | `localhost`                               |
-| `SINGLE_TENANT_SLUG`   | _unset_ (multi-tenant)             | `ana-and-ben`                         | _unset_                                   |
-| `MIGRATE_DATABASE_URL` | **never set on Vercel**            | **never set on Vercel**               | only in `packages/db/.env`, per branch    |
+| Variable               | Production                               | Preview                               | Development (local `apps/web/.env.local`) |
+| ---------------------- | ---------------------------------------- | ------------------------------------- | ----------------------------------------- |
+| `DATABASE_URL`         | `ww_app_login` @ `production` **pooler** | `ww_app_login` @ `preview` **pooler** | `ww_app_login` @ `develop` pooler         |
+| `ROOT_DOMAIN`          | `<ROOT_DOMAIN>`                          | `<ROOT_DOMAIN>` (unused while pinned) | `localhost`                               |
+| `SINGLE_TENANT_SLUG`   | _unset_ (multi-tenant)                   | `ana-and-ben`                         | _unset_                                   |
+| `MIGRATE_DATABASE_URL` | **never set on Vercel**                  | **never set on Vercel**               | only in `packages/db/.env`, per branch    |
 
 `<ROOT_DOMAIN>` is currently **`wedding-website-gamma-teal-87.vercel.app`**, the production alias
 (no domain bought; see [Domains](#domains)).
@@ -36,17 +36,17 @@ environment.** Never add one entry that targets both Production and Preview.
 Record the Neon endpoint of each branch here once created, so the preview check in the runbook
 has something to compare against:
 
-| Branch    | Endpoint (the `ep-…` part of the host) |
-| --------- | -------------------------------------- |
-| `main`    | `<ep-main>`                            |
-| `preview` | `<ep-preview>`                         |
-| `dev`     | `<ep-dev>`                             |
+| Branch       | Endpoint (the `ep-…` part of the host) |
+| ------------ | -------------------------------------- |
+| `production` | `ep-cold-wave-b3iob01v`                |
+| `preview`    | `<ep-preview>`                         |
+| `develop`    | `ep-curly-meadow-b31095ku`             |
 
 ### Invariants
 
 - **The app connects only as `ww_app_login`** (member of `ww_app`, `NOBYPASSRLS`). The owner role
   bypasses RLS; it's used for migrations and the seed, from a laptop, and never reaches Vercel.
-- **Preview never points at `main`.** A preview deploy writing to production silently corrupts
+- **Preview never points at `production`.** A preview deploy writing to production silently corrupts
   real data, and from Sprint 3 onward it would also leak guest PII. The runbook's pre-merge check
   verifies this.
 - **The build reads no env.** `DATABASE_URL`, `ROOT_DOMAIN` and `SINGLE_TENANT_SLUG` are read at
@@ -99,11 +99,11 @@ has something to compare against:
 
 ## One-time setup
 
-1. **Neon `main` (production):** the project's root branch. Migrate it, create `ww_app_login`
+1. **Neon `production`:** the project's root branch. Migrate it, create `ww_app_login`
    and seed it per the runbook's
    [Production database](../docs/runbook.md#production-database-demo-data). Record its endpoint
    above.
-2. **Neon:** create branch `preview` from `dev`. The `ww_app_login` role and its password come
+2. **Neon:** create branch `preview` from `develop`. The `ww_app_login` role and its password come
    with it. Confirm it holds only the demo seed. Record its endpoint above.
 3. **Vercel project:** import the GitHub repo and set Root Directory `apps/web`. Framework, build
    command and region come from `vercel.json`. Set Node.js to 22.x (matches `.nvmrc`).

@@ -76,22 +76,23 @@ Migrations run from a laptop as the **owner** role (`MIGRATE_DATABASE_URL`, dire
    policy and `ww_app` grants, which drizzle-kit can't generate. Never edit an applied migration.
 2. Apply in order, pointing `packages/db/.env`'s `MIGRATE_DATABASE_URL` at each branch in turn:
    ```sh
-   pnpm --filter @ww/db db:migrate   # dev → preview → main
+   pnpm --filter @ww/db db:migrate   # develop → preview → production
    ```
 3. `preview` is shared, so a migration applied there affects every open PR's preview. Apply to
    `preview` only when the PR is ready. If a preview-only migration has to be undone, reset the
    branch (below) instead of hand-reverting it.
-4. Apply to `main` just before merging.
+4. Apply to `production` just before merging.
 
 ## Production database (demo data)
 
-The production branch (`main`) holds **only the demo seed** (`ana-and-ben`, `carla-and-dan`,
+The Neon `production` branch holds **only the demo seed** (`ana-and-ben`, `carla-and-dan`,
 `eli-and-faye`) until the first real client. That's what lets the showcase run on production.
-It's the one exception to the seed's "dev branches only" rule, so it lasts only while there's no
+It's the one exception to the seed's "non-production branches only" rule, so it lasts only while there's no
 real data on the branch.
 
 **Set up** (once, done in WW-10). Put the branch's URLs in `packages/db/.env.prod.local`
-(gitignored by `.env*.local`), never in `packages/db/.env`, so a stray command can't hit prod:
+(gitignored by `.env*.local`), never in `packages/db/.env`, so a stray command can't hit prod.
+Single-quote each value: Neon URLs contain `&`, which breaks `.` (sourcing) unquoted.
 
 1. `MIGRATE_DATABASE_URL` = owner role, direct host. Then apply the migrations:
    ```sh
@@ -129,9 +130,9 @@ infra/README.md.
 
 ## Reset the preview database
 
-Neon Console → Branches → `preview` → **Reset from parent**. It returns to `dev`'s current
+Neon Console → Branches → `preview` → **Reset from parent**. It returns to `develop`'s current
 state. The endpoint and connection string stay the same, so Vercel needs no change. Use this
-when previews have drifted or picked up junk data. It never touches `main`.
+when previews have drifted or picked up junk data. It never touches `production`.
 
 ## Roll back
 
@@ -140,8 +141,8 @@ when previews have drifted or picked up junk data. It never touches `main`.
   It's only safe if the current schema still suits the old code, which is why migrations are
   expand/contract.
 - **Schema:** fix forward with a new migration. Don't roll back by hand.
-- **Data:** Neon point-in-time restore on `main` (Console → Restore). Restore into a new branch
-  first to inspect it before touching `main`. The restore window depends on the Neon plan.
+- **Data:** Neon point-in-time restore on `production` (Console → Restore). Restore into a new branch
+  first to inspect it before touching `production`. The restore window depends on the Neon plan.
 
 ## Env var changes
 
@@ -180,4 +181,4 @@ Each Neon branch has its own copy of `ww_app_login`, so rotate per branch.
 - **Slow first request after idle:** Neon compute waking from scale-to-zero. Expected on the free
   plan.
 - **Every page 404s on a preview:** `SINGLE_TENANT_SLUG` is missing from Preview, or the slug
-  doesn't exist in the `preview` branch. Reseed, or reset it from `dev`.
+  doesn't exist in the `preview` branch. Reseed, or reset it from `develop`.
