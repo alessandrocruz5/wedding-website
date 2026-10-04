@@ -14,6 +14,10 @@ domains) are in [docs/runbook.md](../docs/runbook.md).
 | Build cache    | Vercel Remote Cache (Turborepo), shared by Vercel builds, CI and local.                                              |
 | Deploy trigger | Vercel's Git integration: every pushed branch → Preview, `main` → Production.                                        |
 
+The production branch `main` is the project's root branch. It holds **demo data only** until
+the first real client (see the runbook's
+[Production database](../docs/runbook.md#production-database-demo-data)).
+
 ## Environment matrix
 
 Set in Vercel → Project → Settings → Environment Variables. **Each row is a separate entry per
@@ -25,6 +29,9 @@ environment.** Never add one entry that targets both Production and Preview.
 | `ROOT_DOMAIN`          | `<ROOT_DOMAIN>`                    | `<ROOT_DOMAIN>` (unused while pinned) | `localhost`                               |
 | `SINGLE_TENANT_SLUG`   | _unset_ (multi-tenant)             | `ana-and-ben`                         | _unset_                                   |
 | `MIGRATE_DATABASE_URL` | **never set on Vercel**            | **never set on Vercel**               | only in `packages/db/.env`, per branch    |
+
+`<ROOT_DOMAIN>` is currently **`wedding-website-gamma-teal-87.vercel.app`**, the production alias
+(no domain bought; see [Domains](#domains)).
 
 Record the Neon endpoint of each branch here once created, so the preview check in the runbook
 has something to compare against:
@@ -76,6 +83,13 @@ has something to compare against:
 
 ## Domains
 
+- **Current state (Sprint 2):** no domain is owned. `ROOT_DOMAIN` is the production
+  `*.vercel.app` alias, and demos are served by path: `https://<ROOT_DOMAIN>/s/{slug}`.
+  Vercel doesn't issue wildcard subdomains under `vercel.app`, so `{slug}.<ROOT_DOMAIN>` doesn't
+  work yet. Only the alias is a platform host. Other production URLs (per-deployment
+  `…-<hash>.vercel.app`, `…-git-main-….vercel.app`) resolve as unknown custom domains and 404, so
+  smoke-test against the alias. Moving to subdomains later takes a domain, the steps below and
+  a `ROOT_DOMAIN` change, with no code change.
 - **Platform:** apex `<ROOT_DOMAIN>` plus wildcard `*.<ROOT_DOMAIN>` on the Vercel project.
   `{slug}.<ROOT_DOMAIN>` serves that site, and the apex serves `/s/{slug}`. **Wildcard
   certificates need the domain's nameservers to be Vercel's** (`ns1.vercel-dns.com`,
@@ -85,19 +99,24 @@ has something to compare against:
 
 ## One-time setup
 
-1. **Neon:** create branch `preview` from `dev`. The `ww_app_login` role and its password come
+1. **Neon `main` (production):** the project's root branch. Migrate it, create `ww_app_login`
+   and seed it per the runbook's
+   [Production database](../docs/runbook.md#production-database-demo-data). Record its endpoint
+   above.
+2. **Neon:** create branch `preview` from `dev`. The `ww_app_login` role and its password come
    with it. Confirm it holds only the demo seed. Record its endpoint above.
-2. **Vercel project:** import the GitHub repo and set Root Directory `apps/web`. Framework, build
+3. **Vercel project:** import the GitHub repo and set Root Directory `apps/web`. Framework, build
    command and region come from `vercel.json`. Set Node.js to 22.x (matches `.nvmrc`).
-3. **Env vars:** add the matrix above, one entry per environment. Leave `DATABASE_URL` as a
+4. **Env vars:** add the matrix above, one entry per environment. Leave `DATABASE_URL` as a
    regular encrypted variable, not "Sensitive": Sensitive values can't be read back, which
    makes the preview check impossible.
-4. **Domains:** add `<ROOT_DOMAIN>` and `*.<ROOT_DOMAIN>`, then move the nameservers to Vercel.
-5. **Remote cache in CI:** in Vercel team settings, create an OIDC policy for
+5. **Domains:** add `<ROOT_DOMAIN>` and `*.<ROOT_DOMAIN>`, then move the nameservers to Vercel.
+   Skipped while `ROOT_DOMAIN` is the `vercel.app` alias.
+6. **Remote cache in CI:** in Vercel team settings, create an OIDC policy for
    `alessandrocruz5/wedding-website`. Then add the repository variable
    `TURBO_TEAM=<vercel team slug>` (GitHub → Settings → Secrets and variables → Actions →
    Variables).
-6. **Local CLI:** `cd apps/web && vercel link` (writes `.vercel/`, gitignored).
+7. **Local CLI:** `cd apps/web && vercel link` (writes `.vercel/`, gitignored).
 
 ## Plan and cost notes
 

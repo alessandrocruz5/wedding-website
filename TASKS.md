@@ -24,7 +24,7 @@ Neon isolation tests); `next build` clean; local prod smoke against Neon `dev`: 
 not logged in; `wedding-website.vercel.app` is someone else's project), apex `/` 404s, demo sites
 look identical, no favicon/OG/robots/sitemap, README stale, `apps/web/.gitignore` (`.vercel`) untracked.
 
-- [ ] WW-10 — Production deploy on Vercel + Neon · Added · files: apps/web/.gitignore, infra/README.md, docs/runbook.md, TASKS.md (close WW-8 open tasks) · depends: — · ⚠️ high-stakes (prod credentials / DB role) → code-guardian
+- [~] WW-10 — Production deploy on Vercel + Neon · Added · files: apps/web/.gitignore, infra/README.md, docs/runbook.md, TASKS.md (close WW-8 open tasks) · depends: — · ⚠️ high-stakes (prod credentials / DB role) → code-guardian
   - Neon `prod` branch: migrations + demo seed + `ww_app_login` (password set in Console, not SQL — `28P01`). Vercel Production env: `DATABASE_URL` (app role, pooled), `ROOT_DOMAIN` = prod alias. Preview stays pinned `SINGLE_TENANT_SLUG=ana-and-ben` on `preview`. Runbook gate: prod `DATABASE_URL` absent from Preview; `MIGRATE_DATABASE_URL` absent everywhere.
 - [ ] WW-11 — Platform landing page at `/` + site metadata · Added · files: apps/web/app/page.tsx (new), apps/web/app/layout.tsx, apps/web/app/{icon.svg,opengraph-image.*,robots.ts,sitemap.ts} (new), apps/web/middleware.ts, apps/web/src/lib/__tests__/resolve-host.test.ts · depends: —
   - ⚠️ Middleware matcher only excludes `favicon.ico|robots.txt|sitemap.xml`; new icon/OG routes would be rewritten into tenant routes and 404 on tenant hosts. Extend the matcher + tests. `decideRoute` already returns `pass` for platform-host `/`.
