@@ -29,6 +29,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Everything except API routes, Next internals and root-level static files.
-  matcher: ["/((?!api/|_next/|favicon.ico|robots.txt|sitemap.xml).*)"],
+  // Everything except API routes, Next internals and root-level static/metadata files. The
+  // metadata image routes (icon, social preview) are prefix matches: Next may append a hash.
+  matcher: ["/((?!api/|_next/|favicon.ico|icon.svg|opengraph-image|robots.txt|sitemap.xml).*)"],
 };

@@ -1,8 +1,10 @@
 import { createEnv, EnvValidationError } from "@ww/env";
 import { describe, expect, it } from "vitest";
+import { config as middlewareConfig } from "../../../middleware";
 import {
   decideRoute,
   normalizeHost,
+  platformOrigin,
   siteBasePath,
   siteLookups,
   subdomainSlug,
@@ -258,5 +260,68 @@ describe("tenantEnvSchema", () => {
     expect(() => createEnv(tenantEnvSchema, { ROOT_DOMAIN: "weddings.test:3000" })).toThrow(
       EnvValidationError,
     );
+  });
+});
+
+describe("landing page routing", () => {
+  it("passes `/` on the platform host (and www) to the landing page", () => {
+    expect(decideRoute("weddings.test", "/", multi)).toEqual({ kind: "pass" });
+    expect(decideRoute("www.weddings.test:3000", "/", multi)).toEqual({ kind: "pass" });
+  });
+
+  it("serves the site at `/` on tenant hosts", () => {
+    expect(decideRoute("ana-and-ben.weddings.test", "/", multi)).toEqual({
+      kind: "site",
+      key: "h.ana-and-ben.weddings.test",
+      path: "/sites/h.ana-and-ben.weddings.test",
+    });
+    expect(decideRoute("eliandfaye.example.com", "/", multi).kind).toBe("site");
+  });
+
+  it("serves the pinned site at `/`, even on the platform host", () => {
+    expect(decideRoute("weddings.test", "/", pinned)).toEqual({
+      kind: "site",
+      key: "s.carla-and-dan",
+      path: "/sites/s.carla-and-dan",
+    });
+  });
+});
+
+describe("middleware matcher", () => {
+  const [source] = middlewareConfig.matcher;
+  // Next compiles the matcher with path-to-regexp; this source is plain regex after the slash.
+  const matcher = new RegExp(`^${source}$`);
+  const runs = (path: string) => matcher.test(path);
+
+  it.each([
+    "/api/health",
+    "/_next/static/chunk.js",
+    "/favicon.ico",
+    "/icon.svg",
+    "/opengraph-image",
+    "/opengraph-image-1a2b3c",
+    "/opengraph-image.png",
+    "/robots.txt",
+    "/sitemap.xml",
+  ])("skips %s, so it is not rewritten into a tenant route", (path) => {
+    expect(runs(path)).toBe(false);
+  });
+
+  it.each([
+    "/",
+    "/s/ana-and-ben",
+    "/rsvp",
+    "/sites/s.ana-and-ben",
+    "/our-icon.svg",
+    "/gallery/icon.svg",
+  ])("still runs for %s", (path) => {
+    expect(runs(path)).toBe(true);
+  });
+});
+
+describe("platformOrigin", () => {
+  it("is http on localhost and https elsewhere", () => {
+    expect(platformOrigin("localhost")).toBe("http://localhost:3000");
+    expect(platformOrigin("ww.vercel.app")).toBe("https://ww.vercel.app");
   });
 });
