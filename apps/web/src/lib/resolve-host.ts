@@ -143,3 +143,8 @@ export function siteLookups(key: string, rootDomain: string): SiteLookup[] | nul
       ]
     : [{ by: "host", hostname }];
 }
+
+/** Canonical origin of the platform host: plain http for `localhost`, https for anything deployed. */
+export function platformOrigin(rootDomain: string): string {
+  return rootDomain === "localhost" ? "http://localhost:3000" : `https://${rootDomain}`;
+}
