@@ -28,7 +28,12 @@ function SiteNav({ names, base, current }: Omit<ChromeProps, "dateLine">) {
   const links: [SitePage, ReactNode][] = [
     ["home", "Home"],
     ["schedule", "Schedule"],
-    ["travel", <>Travel<span className="max-sm:hidden"> &amp; FAQ</span></>],
+    [
+      "travel",
+      <>
+        Travel<span className="max-sm:hidden"> &amp; FAQ</span>
+      </>,
+    ],
   ];
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-background/88 backdrop-blur-md">
