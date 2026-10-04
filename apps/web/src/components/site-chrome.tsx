@@ -1,6 +1,7 @@
 import { buttonClasses, Names } from "@ww/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { getShowcase } from "@/lib/tenant-context";
 
 export type SitePage = "home" | "schedule" | "travel" | "rsvp";
 
@@ -24,24 +25,29 @@ interface ChromeProps {
 }
 
 function SiteNav({ names, base, current }: Omit<ChromeProps, "dateLine">) {
-  const links: [SitePage, string][] = [
+  const links: [SitePage, ReactNode][] = [
     ["home", "Home"],
     ["schedule", "Schedule"],
-    ["travel", "Travel & FAQ"],
+    [
+      "travel",
+      <>
+        Travel<span className="max-sm:hidden"> &amp; FAQ</span>
+      </>,
+    ],
   ];
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-background/88 backdrop-blur-md">
-      <div className="mx-auto flex max-w-content flex-wrap items-center justify-between gap-4 px-6 py-3">
+      <div className="mx-auto flex max-w-content flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3 sm:px-6">
         <Link href={sitePath(base, "home")} className="text-foreground no-underline">
           <Names names={names} className="text-[28px]" />
         </Link>
-        <nav className="flex flex-wrap items-center gap-1">
+        <nav className="flex items-center gap-0.5 sm:gap-1">
           {links.map(([page, label]) => (
             <Link
               key={page}
               href={sitePath(base, page)}
               aria-current={current === page ? "page" : undefined}
-              className={`rounded-full px-4 py-[9px] font-body text-eyebrow font-medium tracking-button text-foreground uppercase no-underline transition-colors duration-160 ease-arc focus-visible:ring-4 focus-visible:ring-focus focus-visible:outline-none ${current === page ? "bg-muted" : "hover:bg-muted/60"}`}
+              className={`rounded-full px-2.5 py-[9px] sm:px-4 font-body text-eyebrow font-medium tracking-button text-foreground uppercase no-underline transition-colors duration-160 ease-arc focus-visible:ring-4 focus-visible:ring-focus focus-visible:outline-none ${current === page ? "bg-muted" : "hover:bg-muted/60"}`}
             >
               {label}
             </Link>
@@ -52,7 +58,7 @@ function SiteNav({ names, base, current }: Omit<ChromeProps, "dateLine">) {
             className={buttonClasses({
               size: "sm",
               variant: current === "rsvp" ? "secondary" : "primary",
-              className: "ml-2",
+              className: "ml-1 sm:ml-2",
             })}
           >
             RSVP
@@ -60,6 +66,20 @@ function SiteNav({ names, base, current }: Omit<ChromeProps, "dateLine">) {
         </nav>
       </div>
     </header>
+  );
+}
+
+/** Demo-only strip (SHOWCASE_MODE=1) so visitors know the site is a showcase, with a way out. */
+function ShowcaseBanner() {
+  const { enabled, landingHref } = getShowcase();
+  if (!enabled) return null;
+  return (
+    <div className="bg-inverse px-4 py-2 text-center text-small text-inverse-foreground">
+      This is a demo wedding site.{" "}
+      <a href={landingHref} className="text-clay-light underline hover:text-inverse-foreground">
+        Back to the platform
+      </a>
+    </div>
   );
 }
 
@@ -94,6 +114,7 @@ function SiteFooter({ names, base, dateLine }: Omit<ChromeProps, "current">) {
 export function SiteShell({ children, ...chrome }: ChromeProps & { children: ReactNode }) {
   return (
     <div className="min-h-dvh bg-background">
+      <ShowcaseBanner />
       <SiteNav names={chrome.names} base={chrome.base} current={chrome.current} />
       <main>{children}</main>
       <SiteFooter names={chrome.names} base={chrome.base} dateLine={chrome.dateLine} />

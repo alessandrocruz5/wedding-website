@@ -17,6 +17,8 @@ export const tenantEnvSchema = baseEnvSchema.extend({
     .toLowerCase()
     .regex(/^[a-z0-9.-]+$/, "must be a bare hostname (no scheme or port)")
     .default("localhost"),
+  /** `1` shows the demo banner on every tenant site (the portfolio deploy only). */
+  SHOWCASE_MODE: z.enum(["0", "1"]).optional(),
 });
 
 let config: TenantConfig | undefined;
@@ -28,4 +30,15 @@ export function getTenantConfig(): TenantConfig {
     config = { singleTenantSlug: env.SINGLE_TENANT_SLUG, rootDomain: env.ROOT_DOMAIN };
   }
   return config;
+}
+
+/** Demo banner state: off unless `SHOWCASE_MODE=1`; `landingHref` is the platform landing page. */
+export function getShowcase(): { enabled: boolean; landingHref: string } {
+  const env = createEnv(tenantEnvSchema);
+  const { rootDomain } = getTenantConfig();
+  return {
+    enabled: env.SHOWCASE_MODE === "1",
+    // Subdomain sites need an absolute link to the apex; locally there is no real apex.
+    landingHref: rootDomain === "localhost" ? "/" : `https://${rootDomain}/`,
+  };
 }

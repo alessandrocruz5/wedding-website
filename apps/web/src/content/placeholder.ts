@@ -105,7 +105,7 @@ export const scheduleDays: { day: string; items: ScheduleItem[] }[] = [
   },
 ];
 
-/** `bookingUrl` is omitted in the sample, so no "Book a room" link renders (no dead links). */
+/** `bookingUrl` is a sample (example.com, reserved by RFC 2606) so the "Book a room" link renders. */
 export const hotels: {
   name: string;
   meta: string;
@@ -118,12 +118,14 @@ export const hotels: {
     meta: "12 min from the farm · shuttle stop",
     badge: "Room block · code HOLLIS27",
     tone: "sand",
+    bookingUrl: "https://example.com/hotel-arlo",
   },
   {
     name: "The Millhouse Inn",
     meta: "6 min from the farm · walkable to town",
     badge: "Room block · until Sept 1",
     tone: "sage",
+    bookingUrl: "https://example.com/the-millhouse-inn",
   },
 ];
 
