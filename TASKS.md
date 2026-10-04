@@ -30,8 +30,9 @@ look identical, no favicon/OG/robots/sitemap, README stale, `apps/web/.gitignore
 - [x] WW-11 — Platform landing page at `/` + site metadata · Added · files: apps/web/app/page.tsx (new), apps/web/app/layout.tsx, apps/web/app/{icon.svg,opengraph-image.*,robots.ts,sitemap.ts} (new), apps/web/middleware.ts, apps/web/src/lib/__tests__/resolve-host.test.ts · depends: —
   - ⚠️ Middleware matcher only excludes `favicon.ico|robots.txt|sitemap.xml`; new icon/OG routes would be rewritten into tenant routes and 404 on tenant hosts. Extend the matcher + tests. `decideRoute` already returns `pass` for platform-host `/`.
 · (merged 2026-10-04)
-- [ ] WW-12 — Demo tenant polish · Changed · files: packages/ui/src/tokens.css, packages/ui/src/styles/design.css, packages/ui/src/__tests__/token-contract.test.ts, apps/web/src/components/site-chrome.tsx, apps/web/src/lib/tenant-context.ts, apps/web/.env.example, apps/web/src/content/placeholder.ts · depends: —
+- [x] WW-12 — Demo tenant polish · Changed · files: packages/ui/src/tokens.css, packages/ui/src/styles/design.css, packages/ui/src/__tests__/token-contract.test.ts, apps/web/src/components/site-chrome.tsx, apps/web/src/lib/tenant-context.ts, apps/web/.env.example, apps/web/src/content/placeholder.ts · depends: —
   - Re-tune `classic`/`garden`/`modern` (CSS only, no seed/DB change) so the 3 demos are distinct; AA contrast for inverse eyebrow; `SHOWCASE_MODE=1` demo banner linking to `/`; sample `bookingUrl`; nav ≤2 rows at 390px. Clears WW-3's follow-ups.
+· (merged 2026-10-04)
 - [ ] WW-13 — Portfolio README + repo presentation · Changed · files: README.md, LICENSE (new, MIT), docs/screenshots/* (new) · depends: WW-10, WW-11, WW-12
   - Live link, screenshots, Mermaid architecture, key decisions, all 5 packages, local setup. Hand the owner the `gh repo edit` command (homepage + topics); don't run it.
 
