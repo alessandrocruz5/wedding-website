@@ -29,10 +29,13 @@ import {
 interface Backend {
   /** Returns a db connected AS THE APP ROLE, against migrated + seeded data. */
   setup: () => Promise<{ db: Database; teardown: () => Promise<void> }>;
+  /** Whether setup loads the RSVP fixtures (and the tests that need them run). */
+  rsvpFixtures: boolean;
 }
 
 // Always runs (CI included): real migration files on in-process Postgres, then drop to ww_app.
 const pglite: Backend = {
+  rsvpFixtures: true,
   setup: async () => {
     const client = new PGlite();
     const db = drizzlePglite(client, { schema });
@@ -48,31 +51,60 @@ const pglite: Backend = {
 
 // Live leg: DATABASE_URL (the app login role) against a migrated + seeded Neon branch.
 // max: 1 forces every query onto one connection, so context leakage would be visible.
-// RSVP fixtures need the owner (ww_app cannot write parties); they are removed on teardown.
+// Without opt-in the live leg writes nothing (every probe rolls back), so it stays safe to point
+// at production. RSVP fixtures need the owner (ww_app cannot write parties) and are COMMITTED
+// for the run, so they load only with ALLOW_TEST_FIXTURES=1, on a dev branch.
 const neon: Backend = {
+  rsvpFixtures: process.env.ALLOW_TEST_FIXTURES === "1",
   setup: async () => {
-    if (!process.env.MIGRATE_DATABASE_URL) {
-      throw new Error("The live leg needs MIGRATE_DATABASE_URL (owner) to load RSVP fixtures.");
-    }
-    const owner = new Pool({ connectionString: process.env.MIGRATE_DATABASE_URL, max: 1 });
     const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
-    for (const p of [owner, pool]) {
+    const db = drizzleNeon(pool, { schema });
+    const pools = [pool];
+    let ownerDb: Database | undefined;
+    if (neon.rsvpFixtures) {
+      const ownerUrl = sameDatabaseOrThrow(
+        process.env.DATABASE_URL,
+        process.env.MIGRATE_DATABASE_URL,
+      );
+      const owner = new Pool({ connectionString: ownerUrl, max: 1 });
+      pools.push(owner);
+      ownerDb = drizzleNeon(owner, { schema });
+    }
+    for (const p of pools) {
       p.on("error", (error: Error) =>
         console.error("[isolation test] idle pool client error", error),
       );
     }
-    const ownerDb = drizzleNeon(owner, { schema });
-    await insertRsvpFixtures(ownerDb);
+    if (ownerDb) await insertRsvpFixtures(ownerDb);
     return {
-      db: drizzleNeon(pool, { schema }),
+      db,
       teardown: async () => {
-        await pool.end();
-        await removeRsvpFixtures(ownerDb);
-        await owner.end();
+        try {
+          if (ownerDb) await removeRsvpFixtures(ownerDb);
+        } finally {
+          await Promise.all(pools.map((p) => p.end()));
+        }
       },
     };
   },
 };
+
+/** The owner URL, if it targets the same Neon endpoint + database as the app URL; else throws. */
+function sameDatabaseOrThrow(appUrl?: string, ownerUrl?: string): string {
+  if (!appUrl || !ownerUrl) {
+    throw new Error("ALLOW_TEST_FIXTURES=1 needs both DATABASE_URL and MIGRATE_DATABASE_URL.");
+  }
+  const target = (url: string) => {
+    const u = new URL(url);
+    return `${u.hostname.replace("-pooler.", ".")}${u.pathname}`;
+  };
+  if (target(appUrl) !== target(ownerUrl)) {
+    throw new Error(
+      `RSVP fixtures refused: owner URL targets ${target(ownerUrl)}, app URL ${target(appUrl)}.`,
+    );
+  }
+  return ownerUrl;
+}
 
 const [siteA, siteB] = DEMO_SITES;
 
@@ -144,6 +176,17 @@ const ZERO = {
 const RLS_VIOLATION = /row-level security/;
 const NO_GRANT = /permission denied for table/;
 const SAME_SITE_FK = /rsvp_responses_invitation_same_site_fk/;
+
+/** Rows a write touched, without RETURNING (the app role can't read reply columns back). */
+function affected(result: unknown): number {
+  const r = result as { rowCount?: number | null; affectedRows?: number };
+  return r.rowCount ?? r.affectedRows ?? Number.NaN;
+}
+
+/** Re-scopes a running (rolled-back) test transaction, bypassing withSite's nesting guard. */
+async function actAs(tx: SiteTx, siteId: string) {
+  await tx.execute(sql`select set_config('app.site_id', ${siteId}, true)`);
+}
 
 async function countAll(q: Database | SiteTx) {
   const count = async (
@@ -274,7 +317,7 @@ function isolationSuite(backend: Backend) {
     expect(rows.map((r) => r.grant)).toEqual([
       "guests:SELECT",
       "invitations:SELECT",
-      "rsvp_responses:INSERT,UPDATE",
+      "rsvp_responses:INSERT", // + the column-level SELECT/UPDATE below
       "site_domains:SELECT",
       "site_members:SELECT",
       "site_theme:DELETE,INSERT,SELECT,UPDATE",
@@ -282,15 +325,19 @@ function isolationSuite(backend: Backend) {
       "users:SELECT",
     ]);
 
-    // Replies are PII: only the key columns an upsert / UPDATE ... WHERE must read are selectable.
+    // Replies are PII: only the upsert's conflict column is readable, and only payload columns
+    // are updatable (a reply can't be moved to another party/site, re-keyed or backdated).
     const cols = (await db.execute(sql`
-      select string_agg(c.column_name, ',' order by c.column_name) as cols
-      from information_schema.columns c
-      where c.table_schema = 'public' and c.table_name = 'rsvp_responses'
-        and has_column_privilege(current_user, 'public.rsvp_responses', c.column_name, 'SELECT')`)) as unknown as {
-      rows: { cols: string }[];
-    };
-    expect(cols.rows[0]?.cols).toBe("id,invitation_id,site_id");
+      select p.priv || ':' || coalesce(string_agg(c.column_name, ',' order by c.column_name), '') as grant
+      from unnest(array['SELECT', 'UPDATE']) as p(priv)
+      left join information_schema.columns c
+        on c.table_schema = 'public' and c.table_name = 'rsvp_responses'
+        and has_column_privilege(current_user, 'public.rsvp_responses', c.column_name, p.priv)
+      group by p.priv order by p.priv`)) as unknown as { rows: { grant: string }[] };
+    expect(cols.rows.map((r) => r.grant)).toEqual([
+      "SELECT:invitation_id",
+      "UPDATE:dietary,email,guests,note,shuttle,shuttle_seats,song,updated_at",
+    ]);
 
     const fns = (await db.execute(sql`
       select f.sig, has_function_privilege(current_user, f.sig, 'EXECUTE') as app,
@@ -322,6 +369,23 @@ function isolationSuite(backend: Backend) {
       "users",
     ]);
     expect(tables.filter((r) => !r.enabled || !r.forced)).toEqual([]);
+  });
+
+  it("ties guests and replies to an invitation of the SAME site (composite FKs)", async () => {
+    // FK checks bypass RLS; a single-column FK would let a tenant attach rows to B's party.
+    const { rows } = (await db.execute(sql`
+      select c.conname as name, string_agg(a.attname, ',' order by k.ord) as cols
+      from pg_constraint c
+      cross join unnest(c.conkey) with ordinality as k(attnum, ord)
+      join pg_attribute a on a.attrelid = c.conrelid and a.attnum = k.attnum
+      where c.contype = 'f' and c.confrelid = 'public.invitations'::regclass
+      group by c.conname order by c.conname`)) as unknown as {
+      rows: { name: string; cols: string }[];
+    };
+    expect(rows).toEqual([
+      { name: "guests_invitation_same_site_fk", cols: "site_id,invitation_id" },
+      { name: "rsvp_responses_invitation_same_site_fk", cols: "site_id,invitation_id" },
+    ]);
   });
 
   it("each demo tenant sees exactly its own seeded rows", async () => {
@@ -486,7 +550,8 @@ function isolationSuite(backend: Backend) {
     });
   });
 
-  describe("RSVP tables", () => {
+  // Needs the fixture parties: always on PGlite, opt-in (ALLOW_TEST_FIXTURES=1) on the live leg.
+  describe.skipIf(!backend.rsvpFixtures)("RSVP tables (fixture parties)", () => {
     it("within withSite(A), sees only A's parties and guests", async () => {
       const seen = await withSite(db, siteA.id, async (tx) => ({
         invitations: await tx
@@ -525,7 +590,8 @@ function isolationSuite(backend: Backend) {
       expect(own).toEqual([{ invitationId: rsvpB.invitationId }]);
     });
 
-    it("can submit and re-submit its own reply (upsert) but never read it back", async () => {
+    it("can submit and re-submit its own reply (upsert)", async () => {
+      // As WW-18 writes it: bound values in SET (excluded.* would need SELECT on those columns).
       const upsert = (tx: SiteTx, note: string) =>
         tx
           .insert(rsvpResponses)
@@ -533,33 +599,66 @@ function isolationSuite(backend: Backend) {
           .onConflictDoUpdate({
             target: rsvpResponses.invitationId,
             set: { note, updatedAt: new Date() },
-          })
-          .returning({ id: rsvpResponses.id });
-      const ids = await rolledBack(db, siteA.id, async (tx) => [
-        ...(await upsert(tx, "first")),
-        ...(await upsert(tx, "second")),
-      ]);
-      expect(ids).toHaveLength(2);
-      expect(ids[0]?.id).toBe(ids[1]?.id);
+          });
+      const result = await rolledBack(db, siteA.id, async (tx) => ({
+        first: affected(await upsert(tx, "first")),
+        second: affected(await upsert(tx, "second")),
+        rows: await tx
+          .select({ invitationId: rsvpResponses.invitationId })
+          .from(rsvpResponses)
+          .where(eq(rsvpResponses.invitationId, rsvpA.invitationId)),
+      }));
+      expect(result).toEqual({
+        first: 1,
+        second: 1,
+        rows: [{ invitationId: rsvpA.invitationId }],
+      });
+    });
 
+    it("never reads reply PII back (no SELECT *, RETURNING or excluded.*)", async () => {
+      await expectDenied(db, siteA.id, (tx) => tx.select().from(rsvpResponses), NO_GRANT);
       await expectDenied(
         db,
         siteA.id,
-        async (tx) => {
-          await tx.insert(rsvpResponses).values(replyFor(rsvpA));
-          return tx.select().from(rsvpResponses);
-        },
+        (tx) => tx.select({ email: rsvpResponses.email }).from(rsvpResponses),
         NO_GRANT,
       );
       await expectDenied(
         db,
         siteA.id,
-        async (tx) => {
-          await tx.insert(rsvpResponses).values(replyFor(rsvpA));
-          return tx.select({ email: rsvpResponses.email }).from(rsvpResponses);
-        },
+        (tx) =>
+          tx.insert(rsvpResponses).values(replyFor(rsvpA)).returning({ id: rsvpResponses.id }),
         NO_GRANT,
       );
+      await expectDenied(
+        db,
+        siteA.id,
+        (tx) =>
+          tx
+            .insert(rsvpResponses)
+            .values(replyFor(rsvpA))
+            .onConflictDoUpdate({
+              target: rsvpResponses.invitationId,
+              set: { note: sql`excluded.note` },
+            }),
+        NO_GRANT,
+      );
+    });
+
+    it("lists only its own replies (cross-tenant read)", async () => {
+      const seen = await rolledBack(db, siteB.id, async (tx) => {
+        await tx.insert(rsvpResponses).values(replyFor(rsvpB));
+        const list = () =>
+          tx.select({ invitationId: rsvpResponses.invitationId }).from(rsvpResponses);
+        const asB = await list();
+        await actAs(tx, siteA.id);
+        const asA = await list();
+        await actAs(tx, "");
+        return { asB, asA, noContext: await list() };
+      });
+      expect(seen.asB).toContainEqual({ invitationId: rsvpB.invitationId });
+      expect(seen.asA).not.toContainEqual({ invitationId: rsvpB.invitationId });
+      expect(seen.noContext).toEqual([]);
     });
 
     it("refuses replies stamped with, or aimed at, another tenant", async () => {
@@ -578,13 +677,17 @@ function isolationSuite(backend: Backend) {
         SAME_SITE_FK,
         "23503",
       );
-      // Moving A's own reply to B: RLS WITH CHECK (no WHERE, so only the UPDATE policy applies).
+      // Upserting onto B's existing reply: the conflicting row fails the UPDATE policy's USING.
       await expectDenied(
         db,
-        siteA.id,
+        siteB.id,
         async (tx) => {
-          await tx.insert(rsvpResponses).values(replyFor(rsvpA));
-          return tx.update(rsvpResponses).set({ siteId: siteB.id });
+          await tx.insert(rsvpResponses).values(replyFor(rsvpB));
+          await actAs(tx, siteA.id);
+          return tx
+            .insert(rsvpResponses)
+            .values(replyFor(rsvpB, siteA.id))
+            .onConflictDoUpdate({ target: rsvpResponses.invitationId, set: { note: "hijacked" } });
         },
         RLS_VIOLATION,
       );
@@ -597,28 +700,66 @@ function isolationSuite(backend: Backend) {
       );
     });
 
+    it("cannot move, re-key or backdate its own reply (column-level UPDATE)", async () => {
+      for (const set of [
+        { siteId: siteB.id },
+        { invitationId: rsvpB.invitationId },
+        { id: "5a1e0000-0000-4000-8000-0000000000ff" },
+        { submittedAt: new Date(0) },
+      ]) {
+        await expectDenied(
+          db,
+          siteA.id,
+          async (tx) => {
+            await tx.insert(rsvpResponses).values(replyFor(rsvpA));
+            return tx.update(rsvpResponses).set(set);
+          },
+          NO_GRANT,
+        );
+      }
+    });
+
     it("updates aimed at B's reply affect 0 rows", async () => {
-      const affected = await rolledBack(db, siteB.id, async (tx) => {
+      // No RETURNING: it would apply the SELECT policy and mask a loosened UPDATE USING.
+      const counts = await rolledBack(db, siteB.id, async (tx) => {
         await tx.insert(rsvpResponses).values(replyFor(rsvpB));
-        // Same (rolled-back) transaction, now acting as A.
-        await tx.execute(sql`select set_config('app.site_id', ${siteA.id}, true)`);
+        await actAs(tx, siteA.id);
         return {
-          targeted: (
+          targeted: affected(
             await tx
               .update(rsvpResponses)
               .set({ note: "hijacked" })
-              .where(eq(rsvpResponses.invitationId, rsvpB.invitationId))
-              .returning({ id: rsvpResponses.id })
-          ).length,
-          blanket: (
-            await tx
-              .update(rsvpResponses)
-              .set({ note: "hijacked" })
-              .returning({ id: rsvpResponses.id })
-          ).length,
+              .where(eq(rsvpResponses.invitationId, rsvpB.invitationId)),
+          ),
+          blanket: affected(await tx.update(rsvpResponses).set({ note: "hijacked" })),
         };
       });
-      expect(affected).toEqual({ targeted: 0, blanket: 0 });
+      expect(counts).toEqual({ targeted: 0, blanket: 0 });
+    });
+
+    it("refuses reply emails outside reserved domains (no real PII in the demo phase)", async () => {
+      for (const email of ["jordan@gmail.com", "x@example.com.evil.io", "me@notexample.com"]) {
+        await expectDenied(
+          db,
+          siteA.id,
+          (tx) => tx.insert(rsvpResponses).values({ ...replyFor(rsvpA), email }),
+          /rsvp_responses_email_reserved_domain/,
+          "23514",
+        );
+      }
+      const ok = await rolledBack(db, siteA.id, async (tx) => {
+        let n = 0;
+        for (const email of ["Jordan@Example.com", "a@mail.example.org", "b@wedding.test"]) {
+          n += affected(
+            await tx
+              .insert(rsvpResponses)
+              .values({ ...replyFor(rsvpA), email })
+              .onConflictDoUpdate({ target: rsvpResponses.invitationId, set: { email } }),
+          );
+        }
+        return n;
+      });
+      expect(ok).toBe(3);
     });
 
     it("has no write grant on parties or guests, and cannot delete replies", async () => {

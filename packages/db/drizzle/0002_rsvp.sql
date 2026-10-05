@@ -31,9 +31,12 @@ CREATE TABLE "rsvp_responses" (
 	"submitted_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "rsvp_responses_invitation_id_unique" UNIQUE("invitation_id"),
-	CONSTRAINT "rsvp_responses_guests_array" CHECK (jsonb_typeof("rsvp_responses"."guests") = 'array'),
+	CONSTRAINT "rsvp_responses_guests_shape" CHECK (case when jsonb_typeof("rsvp_responses"."guests") = 'array'
+        then jsonb_array_length("rsvp_responses"."guests") between 1 and 20 and pg_column_size("rsvp_responses"."guests") <= 16384
+        else false end),
 	CONSTRAINT "rsvp_responses_shuttle_seats_range" CHECK ("rsvp_responses"."shuttle_seats" between 0 and 20),
 	CONSTRAINT "rsvp_responses_email_length" CHECK (char_length("rsvp_responses"."email") between 3 and 254),
+	CONSTRAINT "rsvp_responses_email_reserved_domain" CHECK (lower("rsvp_responses"."email") ~ '^[^@[:space:]]+@([a-z0-9-]+[.])*(example[.](com|net|org)|[a-z0-9-]+[.](test|example|invalid))$'),
 	CONSTRAINT "rsvp_responses_text_length" CHECK (coalesce(char_length("rsvp_responses"."shuttle"), 0) <= 100
         and coalesce(char_length("rsvp_responses"."dietary"), 0) <= 1000
         and coalesce(char_length("rsvp_responses"."song"), 0) <= 200
@@ -50,10 +53,13 @@ CREATE INDEX "guests_site_id_name_idx" ON "guests" USING btree ("site_id",lower(
 -- 0001_rls: ww_app is non-owner, context is the txn-local app.site_id set by withSite().
 -- Guest names, emails and free text are PII; ww_app reads parties but never reads replies back.
 GRANT SELECT ON public.invitations, public.guests TO ww_app;--> statement-breakpoint
-GRANT INSERT, UPDATE ON public.rsvp_responses TO ww_app;--> statement-breakpoint
--- Key columns only: INSERT ... ON CONFLICT (invitation_id) DO UPDATE and UPDATE ... WHERE need
--- SELECT on the columns they read. Email, note, dietary etc. stay unreadable to the app role.
-GRANT SELECT (id, site_id, invitation_id) ON public.rsvp_responses TO ww_app;--> statement-breakpoint
+GRANT INSERT ON public.rsvp_responses TO ww_app;--> statement-breakpoint
+-- Payload columns only: a reply cannot be moved to another party/site, re-keyed or backdated.
+GRANT UPDATE (guests, shuttle, shuttle_seats, dietary, song, note, email, updated_at)
+  ON public.rsvp_responses TO ww_app;--> statement-breakpoint
+-- INSERT ... ON CONFLICT (invitation_id) DO UPDATE and UPDATE ... WHERE invitation_id = ...
+-- must read the conflict/filter column. Nothing else is readable (no RETURNING *, no excluded.*).
+GRANT SELECT (invitation_id) ON public.rsvp_responses TO ww_app;--> statement-breakpoint
 
 ALTER TABLE public.invitations ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE public.invitations FORCE ROW LEVEL SECURITY;--> statement-breakpoint
@@ -67,8 +73,8 @@ CREATE POLICY invitations_select ON public.invitations FOR SELECT TO ww_app
 CREATE POLICY guests_select ON public.guests FOR SELECT TO ww_app
   USING (site_id = (SELECT public.ww_current_site_id()));--> statement-breakpoint
 
--- The SELECT policy scopes the upsert's conflicting-row check and UPDATE's WHERE; the column
--- grant above limits what it can actually return.
+-- The SELECT policy scopes the upsert's conflicting-row check and UPDATE's WHERE (and limits
+-- which invitation_ids the column grant can list) to the current site.
 CREATE POLICY rsvp_responses_select ON public.rsvp_responses FOR SELECT TO ww_app
   USING (site_id = (SELECT public.ww_current_site_id()));--> statement-breakpoint
 CREATE POLICY rsvp_responses_insert ON public.rsvp_responses FOR INSERT TO ww_app

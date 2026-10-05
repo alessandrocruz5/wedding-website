@@ -37,7 +37,9 @@ const theme = await withSite(getPoolDb(), site.id, (tx) => tx.select().from(site
 6. `pnpm --filter @ww/db test` — reads `.env`, so the isolation suite also runs live against Neon
    (otherwise that leg is reported as skipped). It asserts the connection role is not superuser,
    cannot bypass RLS, owns no tables and cannot `SET ROLE` into anything that can. Every write
-   probe rolls back, so it is safe against a shared branch.
+   probe rolls back, so it is safe against a shared branch. On a dev branch, add
+   `ALLOW_TEST_FIXTURES=1` to also run the RSVP tests (they commit fixture parties for the run;
+   see [RSVP](#rsvp-invitations-guests-rsvp_responses)).
 
 ## Scripts
 
@@ -54,32 +56,50 @@ replies; routing, membership and identity writes arrive with the admin/auth laye
 
 ## RSVP (`invitations`, `guests`, `rsvp_responses`)
 
-- `ww_app` may **read** parties and guests (for the exact-name lookup) and **insert/update**
-  replies. It can read back only a reply's `id`, `site_id`, `invitation_id`: enough for
-  `INSERT … ON CONFLICT (invitation_id) DO UPDATE` and `UPDATE … WHERE`. It can never read the
-  email or free text. In the upsert, `SET` must use bound values, not `excluded.<col>`:
-  reading `excluded` needs SELECT on that column and is refused.
+- `ww_app` may **read** parties and guests (for the exact-name lookup) and **insert** replies.
+  - It may **update** only a reply's payload columns: `guests`, `shuttle`, `shuttle_seats`,
+    `dietary`, `song`, `note`, `email`, `updated_at`. A reply can't be moved to another party or
+    site, re-keyed or backdated.
+  - It can read back only `invitation_id`, which `INSERT … ON CONFLICT (invitation_id) DO UPDATE`
+    and `UPDATE … WHERE invitation_id = …` need. It never sees the email or free text.
+  - So writes take no `RETURNING`, and the upsert's `SET` uses bound values, not
+    `excluded.<col>` (reading `excluded` needs SELECT on that column). Set `updated_at` yourself:
+    there is no trigger.
 - Guests and replies reference their invitation through a composite `(site_id, invitation_id)`
   FK. FK checks bypass RLS, so this is what stops a tenant from attaching rows to another
   tenant's invitation.
-- One reply row per invitation. Per-guest answers live in its `guests` jsonb column. The app validates
-  that each `guestId` belongs to the invitation; the database does not.
+- One reply row per invitation (re-submitting is an upsert). Per-guest answers live in its
+  `guests` jsonb column (1–20 entries, ≤ 16 KB). The app validates that each `guestId` belongs to
+  the invitation, and ignores unknown ids on read; the database does not check them.
+- The grant-matrix test pins all of this.
+  - The live leg loads its fixture parties only with
+    `ALLOW_TEST_FIXTURES=1 pnpm --filter @ww/db test`, on a dev branch. Those rows are
+    committed for the run and removed on teardown.
+  - The owner and app URLs must target the same Neon endpoint and database.
+  - Without the flag, the live leg still writes nothing, so it stays safe against production.
 
 ### Retention
 
-Guest names, emails, dietary notes and messages are **personal data**.
+Guest names, emails, dietary notes and messages are **personal data**. Dietary notes can reveal
+health or religion (special-category data under GDPR).
 
-- **Fake data only, for now.** The free-tier databases (including production) hold only seeded
-  fictional guests. Real guest data must not be loaded until the Guest/RSVP sprint adds consent
-  wording, rate limiting and an admin export/delete path.
-- **No database backups to rely on for erasure.** Deleting a site cascades to its invitations,
-  guests and replies; deleting an invitation cascades to its guests and reply. Neon's
-  point-in-time restore window still holds deleted rows until it expires (it's short on the
-  free tier), so honour erasure requests with a delete, never a restore.
-- **Target once real data exists:** delete a site's RSVP data (invitations cascade) no later than
-  **90 days after the wedding date**, and erase an individual's data on request within 30 days.
-  This needs the wedding date on `sites` and a scheduled purge, both outside this package today.
-- The demo reseed (WW-17) deletes and recreates demo parties, so dev/prod replies don't accumulate.
+- **No real PII in the demo phase.** Parties and guests on the free-tier databases, including
+  production, are seeded fiction (WW-17). Replies are typed by anonymous visitors to the public
+  demo, so the database refuses any email outside reserved domains
+  (`rsvp_responses_email_reserved_domain`: `example.com|net|org`, `*.test|.example|.invalid`).
+  Free text (`note`, `dietary`, `song`) can't be policed the same way, so it is purged on the
+  schedule below.
+- **Demo purge:** run the demo reseed (WW-17) before each recorded demo and at least weekly on
+  production. It deletes and recreates the demo parties, and the cascade removes every reply.
+- **Erase by delete; never restore over an erasure.** Deleting a site cascades to its
+  invitations, guests and replies, and deleting an invitation cascades to its guests and reply.
+  Neon's point-in-time restore window still holds deleted rows until it expires (short on the
+  free tier).
+- **Before real data:** the Guest/RSVP sprint must add consent wording, rate limiting, an admin
+  export/delete path and a migration that lifts the email CHECK. Target from then on: delete a
+  site's RSVP data no later than **90 days after the wedding date**, and erase an individual's
+  data within 30 days of a request. That needs the wedding date on `sites` and a scheduled purge,
+  neither of which exists in this package today.
 
 ⚠️ drizzle-kit does not see RLS, grants or policies (they live in hand-written SQL). A generated
 migration that drops and recreates a table silently loses them — re-add them in the same migration.

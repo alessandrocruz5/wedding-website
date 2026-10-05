@@ -1,5 +1,5 @@
 {
-  "id": "fc8535aa-dc34-4039-918f-d73731973f2c",
+  "id": "65348d51-f1e7-4083-9dd4-0fa593edf64b",
   "prevId": "640ee5eb-e73f-4744-8819-f251c88525c2",
   "version": "7",
   "dialect": "postgresql",
@@ -450,9 +450,9 @@
       },
       "policies": {},
       "checkConstraints": {
-        "rsvp_responses_guests_array": {
-          "name": "rsvp_responses_guests_array",
-          "value": "jsonb_typeof(\"rsvp_responses\".\"guests\") = 'array'"
+        "rsvp_responses_guests_shape": {
+          "name": "rsvp_responses_guests_shape",
+          "value": "case when jsonb_typeof(\"rsvp_responses\".\"guests\") = 'array'\n        then jsonb_array_length(\"rsvp_responses\".\"guests\") between 1 and 20 and pg_column_size(\"rsvp_responses\".\"guests\") <= 16384\n        else false end"
         },
         "rsvp_responses_shuttle_seats_range": {
           "name": "rsvp_responses_shuttle_seats_range",
@@ -461,6 +461,10 @@
         "rsvp_responses_email_length": {
           "name": "rsvp_responses_email_length",
           "value": "char_length(\"rsvp_responses\".\"email\") between 3 and 254"
+        },
+        "rsvp_responses_email_reserved_domain": {
+          "name": "rsvp_responses_email_reserved_domain",
+          "value": "lower(\"rsvp_responses\".\"email\") ~ '^[^@[:space:]]+@([a-z0-9-]+[.])*(example[.](com|net|org)|[a-z0-9-]+[.](test|example|invalid))$'"
         },
         "rsvp_responses_text_length": {
           "name": "rsvp_responses_text_length",

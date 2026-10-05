@@ -21,7 +21,7 @@ export interface RsvpGuestReplyRow {
 
 /**
  * The current RSVP for an invitation: one row per invitation, re-submitting updates it.
- * Holds PII (email, free text). The app role may write it but can read back only key columns.
+ * Holds PII (email, free text). The app role may write it but can read back only `invitation_id`.
  */
 export const rsvpResponses = pgTable(
   "rsvp_responses",
@@ -46,9 +46,21 @@ export const rsvpResponses = pgTable(
       columns: [t.siteId, t.invitationId],
       foreignColumns: [invitations.siteId, invitations.id],
     }).onDelete("cascade"),
-    check("rsvp_responses_guests_array", sql`jsonb_typeof(${t.guests}) = 'array'`),
+    // The only unbounded field on a public write path: cap entries and stored size.
+    check(
+      "rsvp_responses_guests_shape",
+      sql`case when jsonb_typeof(${t.guests}) = 'array'
+        then jsonb_array_length(${t.guests}) between 1 and 20 and pg_column_size(${t.guests}) <= 16384
+        else false end`,
+    ),
     check("rsvp_responses_shuttle_seats_range", sql`${t.shuttleSeats} between 0 and 20`),
     check("rsvp_responses_email_length", sql`char_length(${t.email}) between 3 and 254`),
+    // Demo phase: no real addresses on the free-tier DBs. Reserved names only (RFC 2606).
+    // Lift with a migration once the Guest/RSVP sprint adds consent and retention (README).
+    check(
+      "rsvp_responses_email_reserved_domain",
+      sql`lower(${t.email}) ~ '^[^@[:space:]]+@([a-z0-9-]+[.])*(example[.](com|net|org)|[a-z0-9-]+[.](test|example|invalid))$'`,
+    ),
     check(
       "rsvp_responses_text_length",
       sql`coalesce(char_length(${t.shuttle}), 0) <= 100
