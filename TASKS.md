@@ -39,6 +39,10 @@ Epic: WW-14
       - The Neon setup leaks its pools if the fixture insert throws.
       - Concurrent opted-in live runs on dev collide.
 - [ ] WW-17 — Seed fake invitations and reset · Added · files: packages/db/src/seed.ts (or seed-rsvp.ts), packages/db/package.json, packages/db/README.md · depends: WW-16
+  · (merged 2026-10-05, PR #16) `pnpm --filter @ww/db seed:rsvp` (needs `ALLOW_DEMO_SEED=1`, refuses `NODE_ENV=production`) deletes and recreates 8 fake `ana-and-ben` parties; replies cascade away. Idempotent, other sites and test fixtures untouched.
+    - Downstream (WW-19): lookup names are exact-match, e.g. "Maya Santos", "Jun Tanaka"; "Guest of Jun Tanaka" is the plus-one. Party IDs `1a7e0000-…0100`–`0107`, guest IDs `9e570000-…`.
+    - Downstream (WW-18): `seedRsvp` / `DEMO_RSVP_PARTY_IDS` are exported from `packages/db/src/seed-rsvp.ts` for tests that need real parties.
+    - Test file `src/__tests__/seed-rsvp.test.ts` was added outside the listed files (acceptance required a test).
 - [ ] WW-18 — RSVP server actions · Added · files: apps/web/src/lib/rsvp/{actions,schema}.ts, apps/web/src/lib/rsvp/__tests__/* · depends: WW-16 · ⚠️ guest PII → code-guardian
 - [ ] WW-19 — Wire the RSVP page and demo script · Added · files: apps/web/app/sites/[siteKey]/rsvp/page.tsx, apps/web/src/content/placeholder.ts, docs/demo-script.md · depends: WW-15, WW-17, WW-18
 
