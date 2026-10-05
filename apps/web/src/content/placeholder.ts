@@ -11,6 +11,9 @@ export const details = {
   replyBy: "August 1, 2027",
 };
 
+/** Shown above the RSVP form: the demo only finds seeded fake guests (see docs/demo-script.md). */
+export const rsvpHint = "Try Maya Santos or Jun Tanaka; use an @example.com email.";
+
 /** RSVP choices. Ids are slug-shaped: the server action stores them as-is. */
 export const rsvpMeals: RsvpOption[] = [
   { value: "short-rib", label: "Braised short rib", description: "Parsnip purée, charred carrots" },

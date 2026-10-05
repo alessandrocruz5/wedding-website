@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-05
+
+Sprint 3: single-couple default view and a working RSVP demo on fake guests.
+
+### Added
+- **WW-16:** RSVP schema (`invitations`, `guests`, `rsvp_responses`) with forced RLS, grants
+  and cross-tenant tests.
+- **WW-17:** `seed:rsvp` creates 8 fake demo parties and resets them for repeatable demos.
+- **WW-18:** `lookupInvitation` and `submitRsvp` server actions with strict validation.
+- **WW-19:** the RSVP page runs end to end, with `docs/demo-script.md`.
+
+### Changed
+- **WW-15:** `DEFAULT_SITE_SLUG` serves one couple's site on the platform host and hides the
+  white-label showcase.
+
 ## [0.1.0] - 2026-10-02
 
 Sprint 1: whitelabel wedding site skeleton, plus the Claude Design import.
@@ -37,5 +52,6 @@ Sprint 1: whitelabel wedding site skeleton, plus the Claude Design import.
 - All demo sites seed a placeholder preset, so none shows the default Arc & Hearth palette.
 - Page content is placeholder until Sprint 2. RSVP collects nothing until Sprint 3.
 
-[Unreleased]: https://github.com/alessandrocruz5/wedding-website/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/alessandrocruz5/wedding-website/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/alessandrocruz5/wedding-website/compare/v0.1.0...v0.3.0
 [0.1.0]: https://github.com/alessandrocruz5/wedding-website/releases/tag/v0.1.0

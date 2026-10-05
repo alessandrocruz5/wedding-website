@@ -20,9 +20,23 @@ The three demos are the same components with different per-site theme tokens.
 | -------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------- |
 | ![Ana & Ben, classic](docs/screenshots/demo-classic.png) | ![Carla & Dan, garden](docs/screenshots/demo-garden.png) | ![Eli & Faye, modern](docs/screenshots/demo-modern.png) |
 
-This is a portfolio project on free tiers (Vercel Hobby + Neon). RSVP is UI only and closed, and
-no guest data is collected. Demos are served by path (`/s/{slug}`); subdomain and custom-domain
-routing is implemented and tested, and only needs a domain to go live.
+This is a portfolio project on free tiers (Vercel Hobby + Neon). The homepage serves Ana & Ben
+(`DEFAULT_SITE_SLUG=ana-and-ben`); the three demos stay at `/s/{slug}`. Subdomain and
+custom-domain routing is implemented and tested, and only needs a domain to go live.
+
+### Try the RSVP
+
+RSVP runs end to end on **fake, seeded guests** under RLS. Open
+[/rsvp](https://wedding-website-gamma-teal-87.vercel.app/rsvp), look up **Maya Santos** or
+**Jun Tanaka** (his party has a plus-one), answer for each guest, and enter an `@example.com`
+email. Real addresses are rejected by design.
+
+![RSVP page](docs/screenshots/rsvp.png)
+
+The demo is publicly writable: anyone can overwrite a demo reply, which is acceptable because
+every guest is fake and no real data is collected. There is no rate limit or invite code yet
+(planned for the Guest + RSVP sprint). Replies are reset by reseeding by hand, at least weekly
+(`ALLOW_DEMO_SEED=1 pnpm --filter @ww/db seed:rsvp`; see [docs/demo-script.md](docs/demo-script.md)).
 
 ## Architecture
 
@@ -77,7 +91,7 @@ in the database instead:
 - Tenant context is a transaction-local setting, so it can't outlive the transaction and pooled
   connections stay safe. No context means zero rows.
 - A test suite asserts the exact privilege matrix and tries cross-tenant reads and writes. It
-  runs on PGlite in CI and live against a Neon branch (40 tests).
+  runs on PGlite in CI and live against a Neon branch (64 tests, 54 of them in CI).
 
 Details: [packages/db](packages/db/README.md).
 
@@ -143,8 +157,9 @@ pnpm --filter @ww/web dev
 ```
 
 Open <http://localhost:3000>, or a demo directly at <http://localhost:3000/s/ana-and-ben>.
-Set `SHOWCASE_MODE=1` for the demo banner, or `SINGLE_TENANT_SLUG=ana-and-ben` to pin the app to
-one site on any host.
+Set `SHOWCASE_MODE=1` for the demo banner, `DEFAULT_SITE_SLUG=ana-and-ben` to serve one couple's
+site at `/` (the other sites stay at `/s/{slug}`), or `SINGLE_TENANT_SLUG=ana-and-ben` to pin the
+app to one site on any host. For RSVP, also run `pnpm --filter @ww/db seed:rsvp` (needs `ALLOW_DEMO_SEED=1`).
 
 ## More
 
