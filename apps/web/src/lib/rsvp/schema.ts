@@ -13,21 +13,30 @@ const RESERVED_EMAIL =
 /** A form option id (meal, event, shuttle): short and slug-shaped, never free text. */
 const optionId = z.string().regex(/^[a-z0-9-]{1,40}$/);
 
+/** Postgres `text` rejects NUL (22021): turn it into a validation error, not a failed write. */
+const noNul = (v: string) => !v.includes("\0");
+
 /** Optional free text: trimmed, capped, and "" stored as null. */
 const freeText = (max: number) =>
   z
     .string()
     .trim()
     .max(max)
+    .refine(noNul)
     .nullable()
     .transform((v) => v || null);
 
-/** The name typed at lookup: trimmed, inner whitespace collapsed, same cap as `guests.full_name`. */
+/**
+ * The name typed at lookup: NFC-normalized (a decomposed "José" matches a composed one),
+ * trimmed, inner whitespace collapsed, same cap as `guests.full_name`.
+ */
 export const lookupNameSchema = z
   .string()
+  .normalize("NFC")
   .trim()
   .min(1)
   .max(MAX_NAME)
+  .refine(noNul)
   .transform((v) => v.replace(/\s+/g, " "));
 
 const guestReplySchema = z
@@ -35,7 +44,10 @@ const guestReplySchema = z
     guestId: z.uuid(),
     attending: z.boolean(),
     meal: optionId.nullable(),
-    events: z.array(optionId).max(MAX_EVENTS),
+    events: z
+      .array(optionId)
+      .max(MAX_EVENTS)
+      .refine((es) => new Set(es).size === es.length),
   })
   .refine((g) => g.attending || (g.meal === null && g.events.length === 0), {
     message: "A guest who declines has no meal or events.",
@@ -71,6 +83,10 @@ export const rsvpSubmissionSchema = z
   .refine((r) => r.shuttleSeats <= r.guests.filter((g) => g.attending).length, {
     path: ["shuttleSeats"],
     message: "More seats than attending guests.",
+  })
+  .refine((r) => r.shuttle !== null || r.shuttleSeats === 0, {
+    path: ["shuttleSeats"],
+    message: "Seats need a shuttle.",
   });
 
 export type RsvpSubmissionInput = z.input<typeof rsvpSubmissionSchema>;

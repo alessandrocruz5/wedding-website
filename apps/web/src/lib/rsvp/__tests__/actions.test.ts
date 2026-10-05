@@ -4,6 +4,7 @@ import type * as WwDb from "@ww/db";
 import { getPoolDb } from "@ww/db";
 import * as schema from "@ww/db/schema";
 import { guests, invitations, rsvpResponses, sites } from "@ww/db/schema";
+import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -41,7 +42,10 @@ const PARTY_A2 = {
   siteId: SITE_A.id,
   id: id("1a7e", 0xa2),
   label: "Rosa Mendez",
-  guests: [{ id: id("9e57", 0xa21), fullName: "Rosa Mendez", sortOrder: 0 }],
+  guests: [
+    { id: id("9e57", 0xa21), fullName: "Rosa Mendez", sortOrder: 0 },
+    { id: id("9e57", 0xa22), fullName: "José Núñez", sortOrder: 1 },
+  ],
 };
 const PARTY_B = {
   siteId: SITE_B.id,
@@ -57,7 +61,12 @@ const DUPES = [
   { siteId: SITE_A.id, id: id("1a7e", 0xa3), label: "Alex Kim (1)", guestId: id("9e57", 0xa31) },
   { siteId: SITE_A.id, id: id("1a7e", 0xa4), label: "Alex Kim (2)", guestId: id("9e57", 0xa41) },
 ];
-const PII = [PARTY_A, PARTY_A2, PARTY_B].flatMap((p) => p.guests.map((g) => g.fullName));
+// Every guest name and every free-text value a test submits: none may reach a log line.
+const PII = [
+  ...[PARTY_A, PARTY_A2, PARTY_B].flatMap((p) => p.guests.map((g) => g.fullName)),
+  ...["maya@example.com", "maya.santos@example.org", "No shellfish", "See you there"],
+  ...["original", "hijacked"],
+];
 
 const client = new PGlite();
 const db = drizzle(client, { schema });
@@ -142,7 +151,7 @@ beforeEach(async () => {
 // No guest data in any log line, whatever the test did.
 afterEach(() => {
   const logged = JSON.stringify(consoleSpies.flatMap((s) => s.mock.calls)).toLowerCase();
-  for (const value of [...PII, "maya@example.com", "No shellfish"]) {
+  for (const value of PII) {
     expect(logged).not.toContain(value.toLowerCase());
   }
   consoleSpies.forEach((s) => s.mockRestore());
@@ -166,6 +175,13 @@ describe("lookupInvitation", () => {
     expect(await lookupInvitation("x".repeat(201))).toBeNull();
     expect(await lookupInvitation(42)).toBeNull();
     expect(await lookupInvitation({ name: "Maya Santos" })).toBeNull();
+    expect(await lookupInvitation("Maya\0Santos")).toBeNull();
+  });
+
+  it("matches a decomposed name against the stored composed one (NFC)", async () => {
+    expect(await lookupInvitation("José Núñez".normalize("NFD"))).toMatchObject({
+      invitationId: PARTY_A2.id,
+    });
   });
 
   it("returns null when the name is in more than one party", async () => {
@@ -200,6 +216,10 @@ describe("submitRsvp", () => {
 
   it("is idempotent per invitation: a resubmit updates the one row in place", async () => {
     await submitRsvp(replyForA());
+    // Backdate, so a resubmit that forgot to set updated_at would show.
+    await asOwner(() =>
+      db.update(rsvpResponses).set({ updatedAt: sql`now() - interval '1 hour'` }),
+    );
     const [first] = await storedReplies();
     expect(await submitRsvp(replyForA())).toEqual({ ok: true });
 
@@ -228,7 +248,7 @@ describe("submitRsvp", () => {
       note: null,
       email: "maya.santos@example.org",
     });
-    expect(rows[0]!.updatedAt.getTime()).toBeGreaterThanOrEqual(first!.updatedAt.getTime());
+    expect(rows[0]!.updatedAt.getTime()).toBeGreaterThan(first!.updatedAt.getTime());
   });
 
   it.each([
@@ -239,6 +259,22 @@ describe("submitRsvp", () => {
     ["an over-long dietary note", replyForA({ dietary: "x".repeat(1001) })],
     ["free text as a shuttle option", replyForA({ shuttle: "Pick me up at 5 Main St" })],
     ["more seats than attending guests", replyForA({ shuttleSeats: 2 })],
+    ["seats without a shuttle", replyForA({ shuttle: null, shuttleSeats: 1 })],
+    ["a NUL in free text", replyForA({ note: "hi\0there" })],
+    [
+      "an event listed twice",
+      replyForA({
+        guests: [
+          {
+            guestId: PARTY_A.guests[0]!.id,
+            attending: true,
+            meal: null,
+            events: ["welcome", "welcome"],
+          },
+          { guestId: PARTY_A.guests[1]!.id, attending: false, meal: null, events: [] },
+        ],
+      }),
+    ],
     ["a smuggled siteId", { ...replyForA(), siteId: SITE_B.id }],
     [
       "a decliner with a meal",
@@ -358,16 +394,19 @@ describe("cross-site isolation", () => {
 
 describe("failures don't leak guest data", () => {
   // Drizzle's error message quotes the query params, as the real driver error would.
-  const failingDb = {
-    transaction: async () => {
-      throw Object.assign(new Error("Failed query: … params: maya santos,maya@example.com"), {
-        cause: { code: "57P01" },
-      });
-    },
-  } as unknown as ReturnType<typeof getPoolDb>;
+  const queryError = (code: string) =>
+    Object.assign(new Error("Failed query: … params: maya santos,maya@example.com"), {
+      cause: { code },
+    });
+  const failingDb = (code = "57P01") =>
+    ({
+      transaction: async () => {
+        throw queryError(code);
+      },
+    }) as unknown as ReturnType<typeof getPoolDb>;
 
   it("lookup logs only the SQLSTATE and throws a generic error", async () => {
-    vi.mocked(getPoolDb).mockReturnValueOnce(failingDb);
+    vi.mocked(getPoolDb).mockReturnValueOnce(failingDb());
     const error = await lookupInvitation("Maya Santos").catch((e: unknown) => e);
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toBe("RSVP lookup failed");
@@ -376,11 +415,42 @@ describe("failures don't leak guest data", () => {
   });
 
   it("submit logs only the SQLSTATE and returns a generic message", async () => {
-    vi.mocked(getPoolDb).mockReturnValueOnce(failingDb);
+    vi.mocked(getPoolDb).mockReturnValueOnce(failingDb());
     expect(await submitRsvp(replyForA())).toEqual({
       ok: false,
       error: expect.stringMatching(/try again/),
     });
     expect(console.error).toHaveBeenCalledWith("[rsvp] submit failed", { code: "57P01" });
+  });
+
+  it("maps a CHECK violation (23514) to the invalid-answers message, logging the code", async () => {
+    vi.mocked(getPoolDb).mockReturnValueOnce(failingDb("23514"));
+    expect(await submitRsvp(replyForA())).toEqual({
+      ok: false,
+      error: expect.stringMatching(/check/),
+    });
+    expect(console.error).toHaveBeenCalledWith("[rsvp] submit failed", { code: "23514" });
+  });
+
+  it("maps a vanished party (23503) to the look-it-up-again message", async () => {
+    vi.mocked(getPoolDb).mockReturnValueOnce(failingDb("23503"));
+    expect(await submitRsvp(replyForA())).toEqual({
+      ok: false,
+      error: expect.stringMatching(/couldn’t find/),
+    });
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it("a failing site lookup still comes back as a value / generic error", async () => {
+    vi.mocked(getSite).mockRejectedValueOnce(queryError("08006"));
+    expect(await submitRsvp(replyForA())).toEqual({
+      ok: false,
+      error: expect.stringMatching(/try again/),
+    });
+    expect(console.error).toHaveBeenCalledWith("[rsvp] submit failed", { code: "08006" });
+
+    vi.mocked(getSite).mockRejectedValueOnce(queryError("08006"));
+    await expect(lookupInvitation("Maya Santos")).rejects.toThrow(/^RSVP lookup failed$/);
+    expect(console.error).toHaveBeenCalledWith("[rsvp] lookup failed", { code: "08006" });
   });
 });

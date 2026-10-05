@@ -50,10 +50,10 @@ function logFailure(action: "lookup" | "submit", error: unknown) {
 export async function lookupInvitation(name: unknown): Promise<RsvpLookupResult | null> {
   const parsed = lookupNameSchema.safeParse(name);
   if (!parsed.success) return null;
-  const siteId = await currentSiteId();
-  if (!siteId) return null;
 
   try {
+    const siteId = await currentSiteId();
+    if (!siteId) return null;
     return await withSite(getPoolDb(), siteId, async (tx) => {
       const matches = await tx
         .selectDistinct({ invitationId: guests.invitationId })
@@ -90,10 +90,10 @@ export async function submitRsvp(payload: unknown): Promise<SubmitRsvpResult> {
     return { ok: false, error: emailIssue ? MESSAGES.email : MESSAGES.invalid };
   }
   const reply = parsed.data;
-  const siteId = await currentSiteId();
-  if (!siteId) return { ok: false, error: MESSAGES.failed };
 
   try {
+    const siteId = await currentSiteId();
+    if (!siteId) return { ok: false, error: MESSAGES.failed };
     return await withSite(getPoolDb(), siteId, async (tx): Promise<SubmitRsvpResult> => {
       const party = await tx
         .select({ id: guests.id })
@@ -127,10 +127,10 @@ export async function submitRsvp(payload: unknown): Promise<SubmitRsvpResult> {
     });
   } catch (error) {
     const code = pgCode(error);
-    // 23514: a CHECK the schema should have caught. 23503: the party was removed (reseed) meanwhile.
-    if (code === "23514") return { ok: false, error: MESSAGES.invalid };
+    // 23503: the party was removed (reseed) meanwhile; expected, not logged.
     if (code === "23503") return { ok: false, error: MESSAGES.unknownInvitation };
     logFailure("submit", error);
-    return { ok: false, error: MESSAGES.failed };
+    // 23514: a CHECK the schema should have caught (logged above: schema and DB have drifted).
+    return { ok: false, error: code === "23514" ? MESSAGES.invalid : MESSAGES.failed };
   }
 }
