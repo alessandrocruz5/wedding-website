@@ -16,7 +16,28 @@ Epic: WW-14
 
 - [x] WW-15 — Default-site mode (hide white-label) · Changed · files: apps/web/src/lib/{resolve-host,tenant-context}.ts, apps/web/src/lib/__tests__/resolve-host.test.ts, apps/web/middleware.ts, apps/web/app/{page,sitemap}.tsx, apps/web/.env.example, infra/README.md, docs/runbook.md · depends: —
   · (merged 2026-10-05, PR #14) `DEFAULT_SITE_SLUG` env → `TenantConfig.defaultSiteSlug`; on the platform host `decideRoute` rewrites everything except `/s/…` and `/sites/…` to `s.{slug}`, `siteBasePath` returns `""` for the default site, `SHOWCASE_MODE` banner is forced off, sitemap lists the site's pages. `SINGLE_TENANT_SLUG` still wins. Downstream (WW-19): `/rsvp` on the platform host now serves `app/sites/[siteKey]/rsvp` under key `s.{default}`.
-- [ ] WW-16 — RSVP schema, RLS and grants · Added · files: packages/db/src/schema/{invitations,guests,rsvp,index}.ts, packages/db/drizzle/0002_rsvp.sql (+ meta), packages/db/src/__tests__/tenant-isolation.test.ts, packages/db/README.md · depends: — · ⚠️ high-stakes (migration) → code-guardian
+- [x] WW-16 — RSVP schema, RLS and grants · Added · files: packages/db/src/schema/{invitations,guests,rsvp,index}.ts, packages/db/drizzle/0002_rsvp.sql (+ meta), packages/db/src/__tests__/tenant-isolation.test.ts, packages/db/README.md · depends: — · ⚠️ high-stakes (migration) → code-guardian
+  · (merged 2026-10-05, PR #15) Migration `0002_rsvp` adds `invitations`, `guests` and `rsvp_responses` (one reply per invitation; per-guest answers in `guests` jsonb), all with ENABLE + FORCE RLS. A composite `(site_id, invitation_id)` FK keeps guests and replies in their own site.
+    - **What `ww_app` can do:** SELECT invitations/guests. On replies: INSERT, UPDATE on payload columns only, SELECT `(invitation_id)` only.
+    - **DB constraints:** reply emails must be on reserved domains (`example.com|net|org`, `*.test|.example|.invalid`); `guests` jsonb holds 1–20 entries, ≤16 KB.
+    - **Gate:** code-guardian APPROVE after 3 Blockers fixed (no cross-tenant read test on replies, live-leg owner writes, PII retention). 0002 was amended in place: it had been applied only to Neon dev, which was rolled back and re-migrated. Live dev 64/64 with `ALLOW_TEST_FIXTURES=1`; without it the live leg writes nothing.
+    - **WW-17 (seed):**
+      - Reset by deleting the demo parties; the cascade removes guests and replies.
+      - The README commits to a reseed before each demo and at least weekly on prod.
+      - Party/guest IDs `1a7e…`/`9e57…` with suffixes `a1`/`b1` are reserved for test fixtures.
+      - The seed counts for RSVP tables aren't asserted by the isolation suite.
+    - **WW-18 (actions):**
+      - Writes take no `RETURNING`. Upsert with `onConflictDoUpdate({ target: invitationId, set: <bound values> })`, never `excluded.*`, and always set `updatedAt`.
+      - Use `lower(full_name)` for the lookup (indexed per site).
+      - Zod must validate each jsonb entry and that every `guestId` belongs to the invitation; the DB checks only size and shape.
+      - Use example.com emails in tests, and map CHECK `23514` to a user message.
+    - **WW-19:** hint visitors to use `you@example.com`.
+    - ⚠️ **Prod:** `0002_rsvp` is on Neon dev only. Apply it to `production` (and `preview`) via the runbook before WW-18/19 deploy.
+    - **Open nits (non-blocking):**
+      - No test for `rsvp_responses_guests_shape`.
+      - The README doesn't say an email local part can still carry a real address.
+      - The Neon setup leaks its pools if the fixture insert throws.
+      - Concurrent opted-in live runs on dev collide.
 - [ ] WW-17 — Seed fake invitations and reset · Added · files: packages/db/src/seed.ts (or seed-rsvp.ts), packages/db/package.json, packages/db/README.md · depends: WW-16
 - [ ] WW-18 — RSVP server actions · Added · files: apps/web/src/lib/rsvp/{actions,schema}.ts, apps/web/src/lib/rsvp/__tests__/* · depends: WW-16 · ⚠️ guest PII → code-guardian
 - [ ] WW-19 — Wire the RSVP page and demo script · Added · files: apps/web/app/sites/[siteKey]/rsvp/page.tsx, apps/web/src/content/placeholder.ts, docs/demo-script.md · depends: WW-15, WW-17, WW-18
