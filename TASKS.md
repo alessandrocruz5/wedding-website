@@ -14,7 +14,8 @@ Epic: WW-14
 - Migration follows the runbook: owner role applied locally, `MIGRATE_DATABASE_URL` never in Vercel. Grant-matrix test must change with the migration.
 - Ships v0.3.0 (MINOR) when all 5 units merge. Branch base is `develop`.
 
-- [ ] WW-15 — Default-site mode (hide white-label) · Changed · files: apps/web/src/lib/{resolve-host,tenant-context}.ts, apps/web/src/lib/__tests__/resolve-host.test.ts, apps/web/middleware.ts, apps/web/app/{page,sitemap}.tsx, apps/web/.env.example, infra/README.md, docs/runbook.md · depends: —
+- [x] WW-15 — Default-site mode (hide white-label) · Changed · files: apps/web/src/lib/{resolve-host,tenant-context}.ts, apps/web/src/lib/__tests__/resolve-host.test.ts, apps/web/middleware.ts, apps/web/app/{page,sitemap}.tsx, apps/web/.env.example, infra/README.md, docs/runbook.md · depends: —
+  · (merged 2026-10-05, PR #14) `DEFAULT_SITE_SLUG` env → `TenantConfig.defaultSiteSlug`; on the platform host `decideRoute` rewrites everything except `/s/…` and `/sites/…` to `s.{slug}`, `siteBasePath` returns `""` for the default site, `SHOWCASE_MODE` banner is forced off, sitemap lists the site's pages. `SINGLE_TENANT_SLUG` still wins. Downstream (WW-19): `/rsvp` on the platform host now serves `app/sites/[siteKey]/rsvp` under key `s.{default}`.
 - [ ] WW-16 — RSVP schema, RLS and grants · Added · files: packages/db/src/schema/{invitations,guests,rsvp,index}.ts, packages/db/drizzle/0002_rsvp.sql (+ meta), packages/db/src/__tests__/tenant-isolation.test.ts, packages/db/README.md · depends: — · ⚠️ high-stakes (migration) → code-guardian
 - [ ] WW-17 — Seed fake invitations and reset · Added · files: packages/db/src/seed.ts (or seed-rsvp.ts), packages/db/package.json, packages/db/README.md · depends: WW-16
 - [ ] WW-18 — RSVP server actions · Added · files: apps/web/src/lib/rsvp/{actions,schema}.ts, apps/web/src/lib/rsvp/__tests__/* · depends: WW-16 · ⚠️ guest PII → code-guardian
