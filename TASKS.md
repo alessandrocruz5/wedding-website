@@ -4,6 +4,22 @@ Status: [ ] planned · [~] in progress · [x] merged · [-] cancelled (excluded 
 > Keys below are placeholders (`WW-?n`). Replace each with the real Jira key once the Epic
 > and its children exist in project **WW**.
 
+## Sprint 3 — Single-couple default view + RSVP demo   (planned 2026-10-05)
+Epic: WW-14
+
+**Locked decisions** (approved 2026-10-05 — do not re-litigate)
+- White-labeling is hidden, not removed: new optional `DEFAULT_SITE_SLUG` makes `/` and the site pages on the platform host serve one couple's site (`ana-and-ben`). `/s/{slug}`, subdomains and custom domains keep working. Landing page + `SHOWCASE_MODE` code stay, switched off when a default is set. (Not `SINGLE_TENANT_SLUG`, which would also kill `/s/…`.)
+- RSVP is DB-backed with seeded **fake** guests (no real PII on the free-tier prod DB), all under RLS. A reseed command makes the video repeatable.
+- Lookup is exact-name match, returns no list. Rate limiting, invite codes, confirmation email and admin stay in the later Guest/RSVP sprint.
+- Migration follows the runbook: owner role applied locally, `MIGRATE_DATABASE_URL` never in Vercel. Grant-matrix test must change with the migration.
+- Ships v0.3.0 (MINOR) when all 5 units merge. Branch base is `develop`.
+
+- [ ] WW-15 — Default-site mode (hide white-label) · Changed · files: apps/web/src/lib/{resolve-host,tenant-context}.ts, apps/web/src/lib/__tests__/resolve-host.test.ts, apps/web/middleware.ts, apps/web/app/{page,sitemap}.tsx, apps/web/.env.example, infra/README.md, docs/runbook.md · depends: —
+- [ ] WW-16 — RSVP schema, RLS and grants · Added · files: packages/db/src/schema/{invitations,guests,rsvp,index}.ts, packages/db/drizzle/0002_rsvp.sql (+ meta), packages/db/src/__tests__/tenant-isolation.test.ts, packages/db/README.md · depends: — · ⚠️ high-stakes (migration) → code-guardian
+- [ ] WW-17 — Seed fake invitations and reset · Added · files: packages/db/src/seed.ts (or seed-rsvp.ts), packages/db/package.json, packages/db/README.md · depends: WW-16
+- [ ] WW-18 — RSVP server actions · Added · files: apps/web/src/lib/rsvp/{actions,schema}.ts, apps/web/src/lib/rsvp/__tests__/* · depends: WW-16 · ⚠️ guest PII → code-guardian
+- [ ] WW-19 — Wire the RSVP page and demo script · Added · files: apps/web/app/sites/[siteKey]/rsvp/page.tsx, apps/web/src/content/placeholder.ts, docs/demo-script.md · depends: WW-15, WW-17, WW-18
+
 ## Sprint 2 — Portfolio showcase readiness   (planned 2026-10-04)
 Epic: WW-9
 
@@ -30,10 +46,12 @@ look identical, no favicon/OG/robots/sitemap, README stale, `apps/web/.gitignore
 - [x] WW-11 — Platform landing page at `/` + site metadata · Added · files: apps/web/app/page.tsx (new), apps/web/app/layout.tsx, apps/web/app/{icon.svg,opengraph-image.*,robots.ts,sitemap.ts} (new), apps/web/middleware.ts, apps/web/src/lib/__tests__/resolve-host.test.ts · depends: —
   - ⚠️ Middleware matcher only excludes `favicon.ico|robots.txt|sitemap.xml`; new icon/OG routes would be rewritten into tenant routes and 404 on tenant hosts. Extend the matcher + tests. `decideRoute` already returns `pass` for platform-host `/`.
 · (merged 2026-10-04)
-- [ ] WW-12 — Demo tenant polish · Changed · files: packages/ui/src/tokens.css, packages/ui/src/styles/design.css, packages/ui/src/__tests__/token-contract.test.ts, apps/web/src/components/site-chrome.tsx, apps/web/src/lib/tenant-context.ts, apps/web/.env.example, apps/web/src/content/placeholder.ts · depends: —
+- [x] WW-12 — Demo tenant polish · Changed · files: packages/ui/src/tokens.css, packages/ui/src/styles/design.css, packages/ui/src/__tests__/token-contract.test.ts, apps/web/src/components/site-chrome.tsx, apps/web/src/lib/tenant-context.ts, apps/web/.env.example, apps/web/src/content/placeholder.ts · depends: —
   - Re-tune `classic`/`garden`/`modern` (CSS only, no seed/DB change) so the 3 demos are distinct; AA contrast for inverse eyebrow; `SHOWCASE_MODE=1` demo banner linking to `/`; sample `bookingUrl`; nav ≤2 rows at 390px. Clears WW-3's follow-ups.
-- [ ] WW-13 — Portfolio README + repo presentation · Changed · files: README.md, LICENSE (new, MIT), docs/screenshots/* (new) · depends: WW-10, WW-11, WW-12
+· (merged 2026-10-04)
+- [x] WW-13 — Portfolio README + repo presentation · Changed · files: README.md, LICENSE (new, MIT), docs/screenshots/* (new) · depends: WW-10, WW-11, WW-12
   - Live link, screenshots, Mermaid architecture, key decisions, all 5 packages, local setup. Hand the owner the `gh repo edit` command (homepage + topics); don't run it.
+· (merged 2026-10-05)
 
 ## Sprint 1 — Whitelabel wedding site skeleton on Vercel   (planned 2026-09-28)
 Epic: WW-?E

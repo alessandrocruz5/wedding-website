@@ -2,7 +2,7 @@
  * Pure tenant routing, shared by middleware (Edge, no DB) and the site layout (Node, DB).
  *
  * Precedence: SINGLE_TENANT_SLUG pin → custom domain → subdomain of ROOT_DOMAIN → /s/{slug}
- * on a platform host. Middleware can't tell a custom domain from a subdomain without the DB,
+ * on a platform host → DEFAULT_SITE_SLUG for the rest of the platform host. Middleware can't tell a custom domain from a subdomain without the DB,
  * so it forwards the host as a site key and the layout tries the lookups in order.
  */
 
@@ -22,6 +22,12 @@ export const NOT_FOUND_PATH = "/__ww/not-found";
 export interface TenantConfig {
   /** Pins every request to one site (single-client deploys). */
   singleTenantSlug?: string;
+  /**
+   * Default-site mode: the platform host serves this site at `/` (and `/rsvp`, …) instead of the
+   * landing page. `/s/{slug}`, subdomains and custom domains still route as usual. Ignored when
+   * `singleTenantSlug` is set.
+   */
+  defaultSiteSlug?: string;
   /** Platform apex, e.g. `localhost` or `weddings.example`. Its subdomains are site slugs. */
   rootDomain: string;
 }
@@ -111,15 +117,21 @@ export function decideRoute(
     return { kind: "site", key, path: sitePath(key, rest.length ? `/${rest.join("/")}` : "/") };
   }
   if (first === SITES_SEGMENT || first === PATH_PREFIX) return { kind: "block" };
+  if (config.defaultSiteSlug) {
+    const key: SiteKey = `s.${config.defaultSiteSlug}`;
+    return { kind: "site", key, path: sitePath(key, pathname) };
+  }
   return { kind: "pass" };
 }
 
 /**
  * Prefix for a site's own links, from its key. Unpinned, an `s.` key only comes from `/s/{slug}`
- * on the platform host, so links keep that prefix. Hosts and pinned deploys serve the site at `/`.
+ * on the platform host, so links keep that prefix. Hosts, pinned deploys and the default site serve
+ * the site at `/`.
  */
 export function siteBasePath(key: string, config: TenantConfig): string {
   if (config.singleTenantSlug || !key.startsWith("s.")) return "";
+  if (key === `s.${config.defaultSiteSlug}`) return "";
   return `/${PATH_PREFIX}/${key.slice(2)}`;
 }
 
@@ -142,4 +154,9 @@ export function siteLookups(key: string, rootDomain: string): SiteLookup[] | nul
         { by: "slug", slug },
       ]
     : [{ by: "host", hostname }];
+}
+
+/** Canonical origin of the platform host: plain http for `localhost`, https for anything deployed. */
+export function platformOrigin(rootDomain: string): string {
+  return rootDomain === "localhost" ? "http://localhost:3000" : `https://${rootDomain}`;
 }

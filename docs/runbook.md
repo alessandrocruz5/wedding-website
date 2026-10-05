@@ -180,5 +180,10 @@ Each Neon branch has its own copy of `ww_app_login`, so rotate per branch.
   fail fast with `Invalid environment variables:` and the offending keys.
 - **Slow first request after idle:** Neon compute waking from scale-to-zero. Expected on the free
   plan.
+- **`/` shows the landing page but the couple's site was expected (or the reverse):**
+  `DEFAULT_SITE_SLUG` is set only in the environment that should serve the couple's site at `/`.
+  Set or clear it in Vercel, then redeploy (env is read at request time, but a redeploy picks up
+  the change cleanly). A slug that isn't in that environment's database 404s on `/`, `/rsvp`,
+  `/schedule` and `/travel`, while `/s/{slug}` for real slugs still works.
 - **Every page 404s on a preview:** `SINGLE_TENANT_SLUG` is missing from Preview, or the slug
   doesn't exist in the `preview` branch. Reseed, or reset it from `develop`.

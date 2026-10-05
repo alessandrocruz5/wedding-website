@@ -28,10 +28,17 @@ environment.** Never add one entry that targets both Production and Preview.
 | `DATABASE_URL`         | `ww_app_login` @ `production` **pooler** | `ww_app_login` @ `preview` **pooler** | `ww_app_login` @ `develop` pooler         |
 | `ROOT_DOMAIN`          | `<ROOT_DOMAIN>`                          | `<ROOT_DOMAIN>` (unused while pinned) | `localhost`                               |
 | `SINGLE_TENANT_SLUG`   | _unset_ (multi-tenant)                   | `ana-and-ben`                         | _unset_                                   |
+| `DEFAULT_SITE_SLUG`    | _unset_ (landing page), or `ana-and-ben` | _unset_ (ignored while pinned)        | _unset_                                   |
 | `MIGRATE_DATABASE_URL` | **never set on Vercel**                  | **never set on Vercel**               | only in `packages/db/.env`, per branch    |
 
 `<ROOT_DOMAIN>` is currently **`wedding-website-gamma-teal-87.vercel.app`**, the production alias
 (no domain bought; see [Domains](#domains)).
+
+`DEFAULT_SITE_SLUG` is default-site mode: on the platform host, `/`, `/rsvp`, `/schedule` and
+`/travel` serve that one couple's site, and the landing page and `SHOWCASE_MODE` banner switch off
+(the code stays). `/s/{slug}`, subdomains and custom domains keep working, so it hides the
+white-label framing without removing it. `SINGLE_TENANT_SLUG` wins if both are set. Unset it to
+bring the landing page back.
 
 Record the Neon endpoint of each branch here once created, so the preview check in the runbook
 has something to compare against:
@@ -49,10 +56,10 @@ has something to compare against:
 - **Preview never points at `production`.** A preview deploy writing to production silently corrupts
   real data, and from Sprint 3 onward it would also leak guest PII. The runbook's pre-merge check
   verifies this.
-- **The build reads no env.** `DATABASE_URL`, `ROOT_DOMAIN` and `SINGLE_TENANT_SLUG` are read at
+- **The build reads no env.** `DATABASE_URL`, `ROOT_DOMAIN`, `SINGLE_TENANT_SLUG` and `DEFAULT_SITE_SLUG` are read at
   request time. Turborepo's strict env mode (the default) strips any variable not declared in
   `turbo.json` from `next build`, so a build can't reach a database even though Vercel exposes
-  project variables at build time. Vercel's build log warns that these three variables are
+  project variables at build time. Vercel's build log warns that these four variables are
   "missing from turbo.json". That's expected, so don't "fix" it by adding them to the `build` task.
 - **Previews are pinned to one demo site.** Preview hosts (`*.vercel.app`) aren't platform hosts,
   so without the pin every preview request would resolve as an unknown custom domain and 404.
