@@ -49,8 +49,37 @@ const theme = await withSite(getPoolDb(), site.id, (tx) => tx.select().from(site
 | `test`        | PGlite (+ Neon)        | Isolation suite; live leg runs when `DATABASE_URL` |
 
 New tenant tables must add their grants + policies in a migration; the app role gets no default
-privileges on purpose. Today `ww_app` may write only `site_theme` and update `sites`; routing,
-membership and identity writes arrive with the admin/auth layer (Sprint 4).
+privileges on purpose. Today `ww_app` may write only `site_theme`, update `sites` and submit RSVP
+replies; routing, membership and identity writes arrive with the admin/auth layer (Sprint 4).
+
+## RSVP (`invitations`, `guests`, `rsvp_responses`)
+
+- `ww_app` may **read** parties and guests (for the exact-name lookup) and **insert/update**
+  replies. It can read back only a reply's `id`, `site_id`, `invitation_id`: enough for
+  `INSERT … ON CONFLICT (invitation_id) DO UPDATE` and `UPDATE … WHERE`. It can never read the
+  email or free text. In the upsert, `SET` must use bound values, not `excluded.<col>`:
+  reading `excluded` needs SELECT on that column and is refused.
+- Guests and replies reference their invitation through a composite `(site_id, invitation_id)`
+  FK. FK checks bypass RLS, so this is what stops a tenant from attaching rows to another
+  tenant's invitation.
+- One reply row per invitation. Per-guest answers live in its `guests` jsonb column. The app validates
+  that each `guestId` belongs to the invitation; the database does not.
+
+### Retention
+
+Guest names, emails, dietary notes and messages are **personal data**.
+
+- **Fake data only, for now.** The free-tier databases (including production) hold only seeded
+  fictional guests. Real guest data must not be loaded until the Guest/RSVP sprint adds consent
+  wording, rate limiting and an admin export/delete path.
+- **No database backups to rely on for erasure.** Deleting a site cascades to its invitations,
+  guests and replies; deleting an invitation cascades to its guests and reply. Neon's
+  point-in-time restore window still holds deleted rows until it expires (it's short on the
+  free tier), so honour erasure requests with a delete, never a restore.
+- **Target once real data exists:** delete a site's RSVP data (invitations cascade) no later than
+  **90 days after the wedding date**, and erase an individual's data on request within 30 days.
+  This needs the wedding date on `sites` and a scheduled purge, both outside this package today.
+- The demo reseed (WW-17) deletes and recreates demo parties, so dev/prod replies don't accumulate.
 
 ⚠️ drizzle-kit does not see RLS, grants or policies (they live in hand-written SQL). A generated
 migration that drops and recreates a table silently loses them — re-add them in the same migration.
