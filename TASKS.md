@@ -4,6 +4,22 @@ Status: [ ] planned · [~] in progress · [x] merged · [-] cancelled (excluded 
 > Keys below are placeholders (`WW-?n`). Replace each with the real Jira key once the Epic
 > and its children exist in project **WW**.
 
+## Sprint 3 — Single-couple default view + RSVP demo   (planned 2026-10-05)
+Epic: WW-14
+
+**Locked decisions** (approved 2026-10-05 — do not re-litigate)
+- White-labeling is hidden, not removed: new optional `DEFAULT_SITE_SLUG` makes `/` and the site pages on the platform host serve one couple's site (`ana-and-ben`). `/s/{slug}`, subdomains and custom domains keep working. Landing page + `SHOWCASE_MODE` code stay, switched off when a default is set. (Not `SINGLE_TENANT_SLUG`, which would also kill `/s/…`.)
+- RSVP is DB-backed with seeded **fake** guests (no real PII on the free-tier prod DB), all under RLS. A reseed command makes the video repeatable.
+- Lookup is exact-name match, returns no list. Rate limiting, invite codes, confirmation email and admin stay in the later Guest/RSVP sprint.
+- Migration follows the runbook: owner role applied locally, `MIGRATE_DATABASE_URL` never in Vercel. Grant-matrix test must change with the migration.
+- Ships v0.3.0 (MINOR) when all 5 units merge. Branch base is `develop`.
+
+- [ ] WW-15 — Default-site mode (hide white-label) · Changed · files: apps/web/src/lib/{resolve-host,tenant-context}.ts, apps/web/src/lib/__tests__/resolve-host.test.ts, apps/web/middleware.ts, apps/web/app/{page,sitemap}.tsx, apps/web/.env.example, infra/README.md, docs/runbook.md · depends: —
+- [ ] WW-16 — RSVP schema, RLS and grants · Added · files: packages/db/src/schema/{invitations,guests,rsvp,index}.ts, packages/db/drizzle/0002_rsvp.sql (+ meta), packages/db/src/__tests__/tenant-isolation.test.ts, packages/db/README.md · depends: — · ⚠️ high-stakes (migration) → code-guardian
+- [ ] WW-17 — Seed fake invitations and reset · Added · files: packages/db/src/seed.ts (or seed-rsvp.ts), packages/db/package.json, packages/db/README.md · depends: WW-16
+- [ ] WW-18 — RSVP server actions · Added · files: apps/web/src/lib/rsvp/{actions,schema}.ts, apps/web/src/lib/rsvp/__tests__/* · depends: WW-16 · ⚠️ guest PII → code-guardian
+- [ ] WW-19 — Wire the RSVP page and demo script · Added · files: apps/web/app/sites/[siteKey]/rsvp/page.tsx, apps/web/src/content/placeholder.ts, docs/demo-script.md · depends: WW-15, WW-17, WW-18
+
 ## Sprint 2 — Portfolio showcase readiness   (planned 2026-10-04)
 Epic: WW-9
 
