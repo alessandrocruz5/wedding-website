@@ -16,7 +16,10 @@ const HIGHLIGHTS = [
   },
 ];
 
-/** Platform host only: tenant hosts and pinned deploys are rewritten away from `/` by middleware. */
+/**
+ * Platform host only: tenant hosts, pinned deploys and default-site mode (DEFAULT_SITE_SLUG) are
+ * rewritten away from `/` by middleware, so this page is never reached in those modes.
+ */
 export default function PlatformHome() {
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-16 px-6 py-16">

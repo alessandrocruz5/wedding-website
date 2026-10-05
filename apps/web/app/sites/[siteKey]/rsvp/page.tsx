@@ -1,15 +1,13 @@
-import { RsvpForm, SectionHeading } from "@ww/ui";
+import { SectionHeading } from "@ww/ui";
 import type { Metadata } from "next";
+import { RsvpDemoForm } from "@/components/rsvp-demo-form";
 import { SiteShell } from "@/components/site-chrome";
-import { details } from "@/content/placeholder";
+import { details, rsvpEvents, rsvpMeals } from "@/content/placeholder";
 import { requireSite, type SitePageProps } from "@/lib/site";
 
 export const metadata: Metadata = { title: "RSVP" };
 
-/**
- * The form renders closed: no lookup/submit handlers until Sprint 3 adds invitations, guest
- * storage under RLS and the PII controls. Nothing is collected or sent from this page.
- */
+/** Demo RSVP: lookup and submit hit the DB-backed server actions, against seeded fake guests. */
 export default async function RsvpPage({ params }: SitePageProps) {
   const { site, base } = await requireSite(params);
   return (
@@ -26,7 +24,12 @@ export default async function RsvpPage({ params }: SitePageProps) {
             }
             subtitle={`Kindly reply by ${details.replyBy}. It takes about two minutes.`}
           />
-          <RsvpForm deadline={details.replyBy} weddingDate={details.weddingDate} />
+          <RsvpDemoForm
+            deadline={details.replyBy}
+            weddingDate={details.weddingDate}
+            meals={rsvpMeals}
+            extraEvents={rsvpEvents}
+          />
         </div>
       </section>
     </SiteShell>

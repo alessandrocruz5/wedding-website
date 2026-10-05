@@ -1,13 +1,22 @@
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { Pool } from "@neondatabase/serverless";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { drizzle as drizzleNeon } from "drizzle-orm/neon-serverless";
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import * as schema from "../schema";
-import { siteDomains, siteMembers, sites, siteTheme, users } from "../schema";
+import {
+  guests,
+  invitations,
+  rsvpResponses,
+  siteDomains,
+  siteMembers,
+  sites,
+  siteTheme,
+  users,
+} from "../schema";
 import { DEMO_PLANNER, DEMO_SITES, seedDemo } from "../seed";
 import {
   resolveSiteByHost,
@@ -20,10 +29,13 @@ import {
 interface Backend {
   /** Returns a db connected AS THE APP ROLE, against migrated + seeded data. */
   setup: () => Promise<{ db: Database; teardown: () => Promise<void> }>;
+  /** Whether setup loads the RSVP fixtures (and the tests that need them run). */
+  rsvpFixtures: boolean;
 }
 
 // Always runs (CI included): real migration files on in-process Postgres, then drop to ww_app.
 const pglite: Backend = {
+  rsvpFixtures: true,
   setup: async () => {
     const client = new PGlite();
     const db = drizzlePglite(client, { schema });
@@ -31,6 +43,7 @@ const pglite: Backend = {
       migrationsFolder: fileURLToPath(new URL("../../drizzle", import.meta.url)),
     });
     await seedDemo(db);
+    await insertRsvpFixtures(db);
     await client.exec("SET ROLE ww_app");
     return { db, teardown: () => client.close() };
   },
@@ -38,24 +51,153 @@ const pglite: Backend = {
 
 // Live leg: DATABASE_URL (the app login role) against a migrated + seeded Neon branch.
 // max: 1 forces every query onto one connection, so context leakage would be visible.
+// Without opt-in the live leg writes nothing (every probe rolls back), so it stays safe to point
+// at production. RSVP fixtures need the owner (ww_app cannot write parties) and are COMMITTED
+// for the run, so they load only with ALLOW_TEST_FIXTURES=1, on a dev branch.
 const neon: Backend = {
+  rsvpFixtures: process.env.ALLOW_TEST_FIXTURES === "1",
   setup: async () => {
     const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
-    pool.on("error", (error: Error) =>
-      console.error("[isolation test] idle pool client error", error),
-    );
-    return { db: drizzleNeon(pool, { schema }), teardown: () => pool.end() };
+    const db = drizzleNeon(pool, { schema });
+    const pools = [pool];
+    let ownerDb: Database | undefined;
+    if (neon.rsvpFixtures) {
+      const ownerUrl = sameDatabaseOrThrow(
+        process.env.DATABASE_URL,
+        process.env.MIGRATE_DATABASE_URL,
+      );
+      const owner = new Pool({ connectionString: ownerUrl, max: 1 });
+      pools.push(owner);
+      ownerDb = drizzleNeon(owner, { schema });
+    }
+    for (const p of pools) {
+      p.on("error", (error: Error) =>
+        console.error("[isolation test] idle pool client error", error),
+      );
+    }
+    if (ownerDb) await insertRsvpFixtures(ownerDb);
+    return {
+      db,
+      teardown: async () => {
+        try {
+          if (ownerDb) await removeRsvpFixtures(ownerDb);
+        } finally {
+          await Promise.all(pools.map((p) => p.end()));
+        }
+      },
+    };
   },
 };
 
+/** The owner URL, if it targets the same Neon endpoint + database as the app URL; else throws. */
+function sameDatabaseOrThrow(appUrl?: string, ownerUrl?: string): string {
+  if (!appUrl || !ownerUrl) {
+    throw new Error("ALLOW_TEST_FIXTURES=1 needs both DATABASE_URL and MIGRATE_DATABASE_URL.");
+  }
+  const target = (url: string) => {
+    const u = new URL(url);
+    return `${u.hostname.replace("-pooler.", ".")}${u.pathname}`;
+  };
+  if (target(appUrl) !== target(ownerUrl)) {
+    throw new Error(
+      `RSVP fixtures refused: owner URL targets ${target(ownerUrl)}, app URL ${target(appUrl)}.`,
+    );
+  }
+  return ownerUrl;
+}
+
 const [siteA, siteB] = DEMO_SITES;
-const ZERO = { sites: 0, siteDomains: 0, siteTheme: 0, users: 0, siteMembers: 0 };
+
+/** One party per tenant (A and B), fixed IDs. Test-only; the demo RSVP seed is WW-17. */
+const RSVP_FIXTURES = [
+  {
+    siteId: siteA.id,
+    invitationId: "1a7e0000-0000-4000-8000-0000000000a1",
+    guestId: "9e570000-0000-4000-8000-0000000000a1",
+    fullName: "Isolation Fixture Alpha",
+  },
+  {
+    siteId: siteB.id,
+    invitationId: "1a7e0000-0000-4000-8000-0000000000b1",
+    guestId: "9e570000-0000-4000-8000-0000000000b1",
+    fullName: "Isolation Fixture Bravo",
+  },
+] as const;
+const [rsvpA, rsvpB] = RSVP_FIXTURES;
+
+/** Idempotent. Must run as the owner role (bypasses RLS). */
+async function insertRsvpFixtures(db: Database) {
+  await db
+    .insert(invitations)
+    .values(RSVP_FIXTURES.map((f) => ({ id: f.invitationId, siteId: f.siteId, label: f.fullName })))
+    .onConflictDoNothing();
+  await db
+    .insert(guests)
+    .values(
+      RSVP_FIXTURES.map((f) => ({
+        id: f.guestId,
+        siteId: f.siteId,
+        invitationId: f.invitationId,
+        fullName: f.fullName,
+      })),
+    )
+    .onConflictDoNothing();
+}
+
+/** Owner only. Cascades to the fixtures' guests and any reply. */
+async function removeRsvpFixtures(db: Database) {
+  await db.delete(invitations).where(
+    inArray(
+      invitations.id,
+      RSVP_FIXTURES.map((f) => f.invitationId),
+    ),
+  );
+}
+
+/** A reply for `fixture`'s party, as WW-18's server action would write it. */
+function replyFor(fixture: (typeof RSVP_FIXTURES)[number], siteId: string = fixture.siteId) {
+  return {
+    siteId,
+    invitationId: fixture.invitationId,
+    guests: [{ guestId: fixture.guestId, attending: true, meal: null, events: [] }],
+    email: "fixture@example.com",
+  };
+}
+
+const ZERO = {
+  sites: 0,
+  siteDomains: 0,
+  siteTheme: 0,
+  users: 0,
+  siteMembers: 0,
+  invitations: 0,
+  guests: 0,
+};
 const RLS_VIOLATION = /row-level security/;
 const NO_GRANT = /permission denied for table/;
+const SAME_SITE_FK = /rsvp_responses_invitation_same_site_fk/;
+
+/** Rows a write touched, without RETURNING (the app role can't read reply columns back). */
+function affected(result: unknown): number {
+  const r = result as { rowCount?: number | null; affectedRows?: number };
+  return r.rowCount ?? r.affectedRows ?? Number.NaN;
+}
+
+/** Re-scopes a running (rolled-back) test transaction, bypassing withSite's nesting guard. */
+async function actAs(tx: SiteTx, siteId: string) {
+  await tx.execute(sql`select set_config('app.site_id', ${siteId}, true)`);
+}
 
 async function countAll(q: Database | SiteTx) {
   const count = async (
-    table: typeof sites | typeof siteDomains | typeof siteTheme | typeof users | typeof siteMembers,
+    table:
+      | typeof sites
+      | typeof siteDomains
+      | typeof siteTheme
+      | typeof users
+      | typeof siteMembers
+      | typeof invitations
+      | typeof guests,
   ) => (await q.select().from(table)).length;
   return {
     sites: await count(sites),
@@ -63,6 +205,8 @@ async function countAll(q: Database | SiteTx) {
     siteTheme: await count(siteTheme),
     users: await count(users),
     siteMembers: await count(siteMembers),
+    invitations: await count(invitations),
+    guests: await count(guests),
   };
 }
 
@@ -98,12 +242,13 @@ function pgError(error: unknown): { code?: string; message: string } {
   return { code: current?.code, message: current?.message ?? String(error) };
 }
 
-/** Asserts Postgres refused the write for `reason` — not a unique/FK clash or a Rollback. */
+/** Asserts Postgres refused the write for `reason` — not some other clash or a Rollback. */
 async function expectDenied(
   db: Database,
   siteId: string | null,
   write: (tx: SiteTx) => Promise<unknown>,
   reason: RegExp,
+  code = "42501", // insufficient_privilege (grants and RLS)
 ) {
   const error = await inTx(db, siteId, async (tx) => {
     await write(tx);
@@ -115,7 +260,7 @@ async function expectDenied(
   expect(error, "write was not refused").toBeDefined();
   expect(error, "write succeeded (rolled back by the test)").not.toBeInstanceOf(Rollback);
   const pg = pgError(error);
-  expect(pg.code).toBe("42501");
+  expect(pg.code).toBe(code);
   expect(pg.message).toMatch(reason);
 }
 
@@ -164,16 +309,34 @@ function isolationSuite(backend: Backend) {
     // Catalog check (not probes): any future accidental grant changes this matrix.
     const { rows } = (await db.execute(sql`
       select t.name || ':' || string_agg(p.priv, ',' order by p.priv) as grant
-      from unnest(array['sites', 'site_domains', 'site_theme', 'users', 'site_members']) as t(name)
+      from unnest(array['sites', 'site_domains', 'site_theme', 'users', 'site_members',
+                        'invitations', 'guests', 'rsvp_responses']) as t(name)
       cross join unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']) as p(priv)
       where has_table_privilege(current_user, 'public.' || t.name, p.priv)
       group by t.name order by t.name`)) as unknown as { rows: { grant: string }[] };
     expect(rows.map((r) => r.grant)).toEqual([
+      "guests:SELECT",
+      "invitations:SELECT",
+      "rsvp_responses:INSERT", // + the column-level SELECT/UPDATE below
       "site_domains:SELECT",
       "site_members:SELECT",
       "site_theme:DELETE,INSERT,SELECT,UPDATE",
       "sites:SELECT,UPDATE",
       "users:SELECT",
+    ]);
+
+    // Replies are PII: only the upsert's conflict column is readable, and only payload columns
+    // are updatable (a reply can't be moved to another party/site, re-keyed or backdated).
+    const cols = (await db.execute(sql`
+      select p.priv || ':' || coalesce(string_agg(c.column_name, ',' order by c.column_name), '') as grant
+      from unnest(array['SELECT', 'UPDATE']) as p(priv)
+      left join information_schema.columns c
+        on c.table_schema = 'public' and c.table_name = 'rsvp_responses'
+        and has_column_privilege(current_user, 'public.rsvp_responses', c.column_name, p.priv)
+      group by p.priv order by p.priv`)) as unknown as { rows: { grant: string }[] };
+    expect(cols.rows.map((r) => r.grant)).toEqual([
+      "SELECT:invitation_id",
+      "UPDATE:dietary,email,guests,note,shuttle,shuttle_seats,song,updated_at",
     ]);
 
     const fns = (await db.execute(sql`
@@ -187,10 +350,49 @@ function isolationSuite(backend: Backend) {
     ]);
   });
 
+  it("has RLS enabled and forced on every table in public", async () => {
+    const { rows } = (await db.execute(sql`
+      select c.relname as name, c.relrowsecurity as enabled, c.relforcerowsecurity as forced
+      from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind = 'r' order by c.relname`)) as unknown as {
+      rows: { name: string; enabled: boolean; forced: boolean }[];
+    };
+    const tables = rows.filter((r) => r.name !== "__drizzle_migrations");
+    expect(tables.map((r) => r.name)).toEqual([
+      "guests",
+      "invitations",
+      "rsvp_responses",
+      "site_domains",
+      "site_members",
+      "site_theme",
+      "sites",
+      "users",
+    ]);
+    expect(tables.filter((r) => !r.enabled || !r.forced)).toEqual([]);
+  });
+
+  it("ties guests and replies to an invitation of the SAME site (composite FKs)", async () => {
+    // FK checks bypass RLS; a single-column FK would let a tenant attach rows to B's party.
+    const { rows } = (await db.execute(sql`
+      select c.conname as name, string_agg(a.attname, ',' order by k.ord) as cols
+      from pg_constraint c
+      cross join unnest(c.conkey) with ordinality as k(attnum, ord)
+      join pg_attribute a on a.attrelid = c.conrelid and a.attnum = k.attnum
+      where c.contype = 'f' and c.confrelid = 'public.invitations'::regclass
+      group by c.conname order by c.conname`)) as unknown as {
+      rows: { name: string; cols: string }[];
+    };
+    expect(rows).toEqual([
+      { name: "guests_invitation_same_site_fk", cols: "site_id,invitation_id" },
+      { name: "rsvp_responses_invitation_same_site_fk", cols: "site_id,invitation_id" },
+    ]);
+  });
+
   it("each demo tenant sees exactly its own seeded rows", async () => {
     for (const [i, site] of DEMO_SITES.entries()) {
       const people = i < 2 ? 2 : 1; // owner (+ shared planner on the first two sites)
-      expect(await withSite(db, site.id, (tx) => countAll(tx)), site.slug).toEqual({
+      // RSVP rows are covered below; their count depends on the (WW-17) demo seed.
+      expect(await withSite(db, site.id, (tx) => countAll(tx)), site.slug).toMatchObject({
         sites: 1,
         siteDomains: site.hostnames.length,
         siteTheme: 1,
@@ -247,6 +449,9 @@ function isolationSuite(backend: Backend) {
         users: (await tx.select().from(users).where(eq(users.id, siteB.owner.id))).length,
         siteMembers: (await tx.select().from(siteMembers).where(eq(siteMembers.siteId, siteB.id)))
           .length,
+        invitations: (await tx.select().from(invitations).where(eq(invitations.siteId, siteB.id)))
+          .length,
+        guests: (await tx.select().from(guests).where(eq(guests.siteId, siteB.id))).length,
       }));
       expect(cross).toEqual(ZERO);
     });
@@ -340,6 +545,251 @@ function isolationSuite(backend: Backend) {
         db,
         siteA.id,
         (tx) => tx.update(users).set({ name: "hijacked" }),
+        NO_GRANT,
+      );
+    });
+  });
+
+  // Needs the fixture parties: always on PGlite, opt-in (ALLOW_TEST_FIXTURES=1) on the live leg.
+  describe.skipIf(!backend.rsvpFixtures)("RSVP tables (fixture parties)", () => {
+    it("within withSite(A), sees only A's parties and guests", async () => {
+      const seen = await withSite(db, siteA.id, async (tx) => ({
+        invitations: await tx
+          .select({ id: invitations.id, siteId: invitations.siteId })
+          .from(invitations),
+        guests: await tx.select({ id: guests.id, siteId: guests.siteId }).from(guests),
+      }));
+      expect(seen.invitations.map((r) => r.id)).toContain(rsvpA.invitationId);
+      expect(seen.guests.map((r) => r.id)).toContain(rsvpA.guestId);
+      expect(new Set([...seen.invitations, ...seen.guests].map((r) => r.siteId))).toEqual(
+        new Set([siteA.id]),
+      );
+    });
+
+    it("returns 0 rows when looking up B's party by id or exact name (cross-tenant read)", async () => {
+      const cross = await withSite(db, siteA.id, async (tx) => ({
+        invitation: (
+          await tx.select().from(invitations).where(eq(invitations.id, rsvpB.invitationId))
+        ).length,
+        guestById: (await tx.select().from(guests).where(eq(guests.id, rsvpB.guestId))).length,
+        guestByName: (
+          await tx
+            .select()
+            .from(guests)
+            .where(sql`lower(${guests.fullName}) = lower(${rsvpB.fullName})`)
+        ).length,
+      }));
+      expect(cross).toEqual({ invitation: 0, guestById: 0, guestByName: 0 });
+      // ...while B itself finds it by the same exact-name lookup.
+      const own = await withSite(db, siteB.id, (tx) =>
+        tx
+          .select({ invitationId: guests.invitationId })
+          .from(guests)
+          .where(sql`lower(${guests.fullName}) = lower(${rsvpB.fullName})`),
+      );
+      expect(own).toEqual([{ invitationId: rsvpB.invitationId }]);
+    });
+
+    it("can submit and re-submit its own reply (upsert)", async () => {
+      // As WW-18 writes it: bound values in SET (excluded.* would need SELECT on those columns).
+      const upsert = (tx: SiteTx, note: string) =>
+        tx
+          .insert(rsvpResponses)
+          .values({ ...replyFor(rsvpA), note })
+          .onConflictDoUpdate({
+            target: rsvpResponses.invitationId,
+            set: { note, updatedAt: new Date() },
+          });
+      const result = await rolledBack(db, siteA.id, async (tx) => ({
+        first: affected(await upsert(tx, "first")),
+        second: affected(await upsert(tx, "second")),
+        rows: await tx
+          .select({ invitationId: rsvpResponses.invitationId })
+          .from(rsvpResponses)
+          .where(eq(rsvpResponses.invitationId, rsvpA.invitationId)),
+      }));
+      expect(result).toEqual({
+        first: 1,
+        second: 1,
+        rows: [{ invitationId: rsvpA.invitationId }],
+      });
+    });
+
+    it("never reads reply PII back (no SELECT *, RETURNING or excluded.*)", async () => {
+      await expectDenied(db, siteA.id, (tx) => tx.select().from(rsvpResponses), NO_GRANT);
+      await expectDenied(
+        db,
+        siteA.id,
+        (tx) => tx.select({ email: rsvpResponses.email }).from(rsvpResponses),
+        NO_GRANT,
+      );
+      await expectDenied(
+        db,
+        siteA.id,
+        (tx) =>
+          tx.insert(rsvpResponses).values(replyFor(rsvpA)).returning({ id: rsvpResponses.id }),
+        NO_GRANT,
+      );
+      await expectDenied(
+        db,
+        siteA.id,
+        (tx) =>
+          tx
+            .insert(rsvpResponses)
+            .values(replyFor(rsvpA))
+            .onConflictDoUpdate({
+              target: rsvpResponses.invitationId,
+              set: { note: sql`excluded.note` },
+            }),
+        NO_GRANT,
+      );
+    });
+
+    it("lists only its own replies (cross-tenant read)", async () => {
+      const seen = await rolledBack(db, siteB.id, async (tx) => {
+        await tx.insert(rsvpResponses).values(replyFor(rsvpB));
+        const list = () =>
+          tx.select({ invitationId: rsvpResponses.invitationId }).from(rsvpResponses);
+        const asB = await list();
+        await actAs(tx, siteA.id);
+        const asA = await list();
+        await actAs(tx, "");
+        return { asB, asA, noContext: await list() };
+      });
+      expect(seen.asB).toContainEqual({ invitationId: rsvpB.invitationId });
+      expect(seen.asA).not.toContainEqual({ invitationId: rsvpB.invitationId });
+      expect(seen.noContext).toEqual([]);
+    });
+
+    it("refuses replies stamped with, or aimed at, another tenant", async () => {
+      // Stamped with B's site_id: RLS WITH CHECK.
+      await expectDenied(
+        db,
+        siteA.id,
+        (tx) => tx.insert(rsvpResponses).values(replyFor(rsvpB)),
+        RLS_VIOLATION,
+      );
+      // Own site_id + B's invitation: RLS passes, the composite (site_id, invitation_id) FK refuses.
+      await expectDenied(
+        db,
+        siteA.id,
+        (tx) => tx.insert(rsvpResponses).values(replyFor(rsvpB, siteA.id)),
+        SAME_SITE_FK,
+        "23503",
+      );
+      // Upserting onto B's existing reply: the conflicting row fails the UPDATE policy's USING.
+      await expectDenied(
+        db,
+        siteB.id,
+        async (tx) => {
+          await tx.insert(rsvpResponses).values(replyFor(rsvpB));
+          await actAs(tx, siteA.id);
+          return tx
+            .insert(rsvpResponses)
+            .values(replyFor(rsvpB, siteA.id))
+            .onConflictDoUpdate({ target: rsvpResponses.invitationId, set: { note: "hijacked" } });
+        },
+        RLS_VIOLATION,
+      );
+      // No context at all.
+      await expectDenied(
+        db,
+        null,
+        (tx) => tx.insert(rsvpResponses).values(replyFor(rsvpA)),
+        RLS_VIOLATION,
+      );
+    });
+
+    it("cannot move, re-key or backdate its own reply (column-level UPDATE)", async () => {
+      for (const set of [
+        { siteId: siteB.id },
+        { invitationId: rsvpB.invitationId },
+        { id: "5a1e0000-0000-4000-8000-0000000000ff" },
+        { submittedAt: new Date(0) },
+      ]) {
+        await expectDenied(
+          db,
+          siteA.id,
+          async (tx) => {
+            await tx.insert(rsvpResponses).values(replyFor(rsvpA));
+            return tx.update(rsvpResponses).set(set);
+          },
+          NO_GRANT,
+        );
+      }
+    });
+
+    it("updates aimed at B's reply affect 0 rows", async () => {
+      // No RETURNING: it would apply the SELECT policy and mask a loosened UPDATE USING.
+      const counts = await rolledBack(db, siteB.id, async (tx) => {
+        await tx.insert(rsvpResponses).values(replyFor(rsvpB));
+        await actAs(tx, siteA.id);
+        return {
+          targeted: affected(
+            await tx
+              .update(rsvpResponses)
+              .set({ note: "hijacked" })
+              .where(eq(rsvpResponses.invitationId, rsvpB.invitationId)),
+          ),
+          blanket: affected(await tx.update(rsvpResponses).set({ note: "hijacked" })),
+        };
+      });
+      expect(counts).toEqual({ targeted: 0, blanket: 0 });
+    });
+
+    it("refuses reply emails outside reserved domains (no real PII in the demo phase)", async () => {
+      for (const email of ["jordan@gmail.com", "x@example.com.evil.io", "me@notexample.com"]) {
+        await expectDenied(
+          db,
+          siteA.id,
+          (tx) => tx.insert(rsvpResponses).values({ ...replyFor(rsvpA), email }),
+          /rsvp_responses_email_reserved_domain/,
+          "23514",
+        );
+      }
+      const ok = await rolledBack(db, siteA.id, async (tx) => {
+        let n = 0;
+        for (const email of ["Jordan@Example.com", "a@mail.example.org", "b@wedding.test"]) {
+          n += affected(
+            await tx
+              .insert(rsvpResponses)
+              .values({ ...replyFor(rsvpA), email })
+              .onConflictDoUpdate({ target: rsvpResponses.invitationId, set: { email } }),
+          );
+        }
+        return n;
+      });
+      expect(ok).toBe(3);
+    });
+
+    it("has no write grant on parties or guests, and cannot delete replies", async () => {
+      await expectDenied(
+        db,
+        siteA.id,
+        (tx) => tx.insert(invitations).values({ siteId: siteA.id, label: "Gatecrashers" }),
+        NO_GRANT,
+      );
+      await expectDenied(
+        db,
+        siteA.id,
+        (tx) =>
+          tx.insert(guests).values({
+            siteId: siteA.id,
+            invitationId: rsvpA.invitationId,
+            fullName: "Plus One",
+          }),
+        NO_GRANT,
+      );
+      await expectDenied(
+        db,
+        siteA.id,
+        (tx) => tx.update(guests).set({ fullName: "hijacked" }),
+        NO_GRANT,
+      );
+      await expectDenied(
+        db,
+        siteA.id,
+        (tx) => tx.delete(rsvpResponses).where(eq(rsvpResponses.invitationId, rsvpA.invitationId)),
         NO_GRANT,
       );
     });

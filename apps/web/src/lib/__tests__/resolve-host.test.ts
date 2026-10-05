@@ -13,6 +13,7 @@ import {
 import { tenantEnvSchema } from "../tenant-context";
 
 const multi: TenantConfig = { rootDomain: "weddings.test" };
+const withDefault: TenantConfig = { rootDomain: "weddings.test", defaultSiteSlug: "ana-and-ben" };
 const pinned: TenantConfig = { rootDomain: "weddings.test", singleTenantSlug: "carla-and-dan" };
 
 describe("normalizeHost", () => {
@@ -284,6 +285,79 @@ describe("landing page routing", () => {
       key: "s.carla-and-dan",
       path: "/sites/s.carla-and-dan",
     });
+  });
+});
+
+describe("default-site mode", () => {
+  const home = { kind: "site", key: "s.ana-and-ben", path: "/sites/s.ana-and-ben" };
+
+  it.each(["weddings.test", "www.weddings.test:3000", "127.0.0.1:3000"])(
+    "serves the default site at `/` on the platform host %s",
+    (host) => {
+      expect(decideRoute(host, "/", withDefault)).toEqual(home);
+    },
+  );
+
+  it.each(["rsvp", "schedule", "travel"])("serves /%s from the default site", (page) => {
+    expect(decideRoute("weddings.test", `/${page}`, withDefault)).toEqual({
+      kind: "site",
+      key: "s.ana-and-ben",
+      path: `/sites/s.ana-and-ben/${page}`,
+    });
+  });
+
+  it("keeps /s/{slug} working for other sites", () => {
+    expect(decideRoute("weddings.test", "/s/carla-and-dan/travel", withDefault)).toEqual({
+      kind: "site",
+      key: "s.carla-and-dan",
+      path: "/sites/s.carla-and-dan/travel",
+    });
+  });
+
+  it("keeps subdomains and custom domains routing to their own sites", () => {
+    expect(decideRoute("carla-and-dan.weddings.test", "/", withDefault)).toEqual({
+      kind: "site",
+      key: "h.carla-and-dan.weddings.test",
+      path: "/sites/h.carla-and-dan.weddings.test",
+    });
+    expect(decideRoute("eliandfaye.example.com", "/rsvp", withDefault).kind).toBe("site");
+  });
+
+  it("still blocks the internal route and malformed /s paths", () => {
+    expect(decideRoute("weddings.test", "/sites/s.ana-and-ben", withDefault)).toEqual({
+      kind: "block",
+    });
+    expect(decideRoute("weddings.test", "/s", withDefault)).toEqual({ kind: "block" });
+    expect(decideRoute("weddings.test", "/s/Not_A_Slug", withDefault)).toEqual({ kind: "block" });
+  });
+
+  it("lets the pin win when both are set", () => {
+    const both = { ...pinned, defaultSiteSlug: "ana-and-ben" };
+    expect(decideRoute("weddings.test", "/", both)).toEqual({
+      kind: "site",
+      key: "s.carla-and-dan",
+      path: "/sites/s.carla-and-dan",
+    });
+  });
+
+  it("is unchanged when unset: `/` still passes to the landing page", () => {
+    expect(decideRoute("weddings.test", "/", multi)).toEqual({ kind: "pass" });
+    expect(decideRoute("weddings.test", "/rsvp", multi)).toEqual({ kind: "pass" });
+  });
+
+  it("links the default site at the root and other /s/ sites with their prefix", () => {
+    expect(siteBasePath("s.ana-and-ben", withDefault)).toBe("");
+    expect(siteBasePath("s.carla-and-dan", withDefault)).toBe("/s/carla-and-dan");
+  });
+
+  it("parses DEFAULT_SITE_SLUG: empty is unset, a malformed value fails fast", () => {
+    expect(createEnv(tenantEnvSchema, { DEFAULT_SITE_SLUG: "" }).DEFAULT_SITE_SLUG).toBeUndefined();
+    expect(createEnv(tenantEnvSchema, { DEFAULT_SITE_SLUG: "ana-and-ben" }).DEFAULT_SITE_SLUG).toBe(
+      "ana-and-ben",
+    );
+    expect(() => createEnv(tenantEnvSchema, { DEFAULT_SITE_SLUG: "Ana & Ben" })).toThrow(
+      EnvValidationError,
+    );
   });
 });
 
