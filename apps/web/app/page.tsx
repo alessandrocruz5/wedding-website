@@ -16,6 +16,9 @@ const HIGHLIGHTS = [
   },
 ];
 
+// Read env per request, never at build time (ROOT_DOMAIN is unset during `next build`).
+export const dynamic = "force-dynamic";
+
 /**
  * Platform host only: tenant hosts, pinned deploys and default-site mode (DEFAULT_SITE_SLUG) are
  * rewritten away from `/` by middleware, so this page is never reached in those modes.
