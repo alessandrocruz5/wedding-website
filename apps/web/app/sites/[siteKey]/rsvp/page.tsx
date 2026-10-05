@@ -2,7 +2,7 @@ import { SectionHeading } from "@ww/ui";
 import type { Metadata } from "next";
 import { RsvpDemoForm } from "@/components/rsvp-demo-form";
 import { SiteShell } from "@/components/site-chrome";
-import { details, rsvpEvents, rsvpMeals } from "@/content/placeholder";
+import { details, rsvpEvents, rsvpHint, rsvpMeals } from "@/content/placeholder";
 import { requireSite, type SitePageProps } from "@/lib/site";
 
 export const metadata: Metadata = { title: "RSVP" };
@@ -24,6 +24,7 @@ export default async function RsvpPage({ params }: SitePageProps) {
             }
             subtitle={`Kindly reply by ${details.replyBy}. It takes about two minutes.`}
           />
+          <p className="text-center text-sm text-muted-foreground">Demo: {rsvpHint}</p>
           <RsvpDemoForm
             deadline={details.replyBy}
             weddingDate={details.weddingDate}
