@@ -22,7 +22,9 @@ Epic: WW-20
 - [ ] Set `DEFAULT_SITE_SLUG=ana-and-ben` in Vercel Production and redeploy.
 - [ ] Weekly reseed reminder.
 
-- [ ] WW-21 — Fix localhost URLs in the homepage preview, robots.txt and sitemap · Fixed · files: apps/web/app/{page.tsx,robots.ts,sitemap.ts}, apps/web/src/lib/__tests__/ (new test) · depends: —
+- [x] WW-21 — Fix localhost URLs in the homepage preview, robots.txt and sitemap · Fixed · files: apps/web/app/{page.tsx,robots.ts,sitemap.ts}, apps/web/src/lib/__tests__/ (new test) · depends: —
+  · (merged 2026-10-06, PR #20) `export const dynamic = "force-dynamic"` on `app/page.tsx`, `robots.ts` and `sitemap.ts`, so `ROOT_DOMAIN` is read per request, not at build. The turbo build env is unchanged (WW-7's contract holds). New test `src/lib/__tests__/dynamic-routes.test.ts` guards the three exports.
+    - ⚠️ Verify on prod after the deploy: `og:image`, `/robots.txt` and `/sitemap.xml` should show the `*.vercel.app` host, not `localhost:3000`.
 - [ ] WW-22 — Make the RSVP demo usable for visitors and refresh the README · Changed · files: apps/web/src/content/placeholder.ts, apps/web/app/sites/[siteKey]/rsvp/page.tsx, README.md, docs/screenshots/rsvp.png (new), docs/screenshots/* (if changed) · depends: WW-21, owner ops (migration, seed, `DEFAULT_SITE_SLUG`)
 
 ## Sprint 3 — Single-couple default view + RSVP demo   (planned 2026-10-05) · v0.3.0
