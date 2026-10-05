@@ -2,14 +2,30 @@
  * SAMPLE CONTENT from the Claude Design kit (WW-3). Every site shows it, under its own names,
  * until Sprint 2's per-site content model replaces this file. Never put real guest data here.
  */
-import type { AccordionItem, BadgeTone } from "@ww/ui";
+import type { AccordionItem, BadgeTone, RsvpEvent, RsvpOption } from "@ww/ui";
 
 export const details = {
   dateLine: "October 16, 2027 · Hollis Farm, Hudson Valley",
   weekendRange: "October 15 – 17",
   weddingDate: "Saturday, October 16",
-  replyBy: "August 1",
+  replyBy: "August 1, 2027",
 };
+
+/** RSVP choices. Ids are slug-shaped: the server action stores them as-is. */
+export const rsvpMeals: RsvpOption[] = [
+  { value: "short-rib", label: "Braised short rib", description: "Parsnip purée, charred carrots" },
+  { value: "halibut", label: "Roasted halibut", description: "Fennel, brown butter, capers" },
+  {
+    value: "risotto",
+    label: "Wild mushroom risotto",
+    description: "Vegetarian · can be made vegan",
+  },
+];
+
+export const rsvpEvents: RsvpEvent[] = [
+  { id: "welcome", label: "Welcome drinks", description: "Friday, 7pm · The Orchard Barn" },
+  { id: "brunch", label: "Farewell brunch", description: "Sunday, 10am · Main House lawn" },
+];
 
 export const story =
   "One of us was late for a train; the other had the only umbrella on the platform. Eight years, two cities and one very patient dog later, we’re getting married on the farm where our grandparents did.";
