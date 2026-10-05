@@ -34,7 +34,9 @@ const theme = await withSite(getPoolDb(), site.id, (tx) => tx.select().from(site
    Set `DATABASE_URL` to this role on the **pooled** (`-pooler`) host.
 5. `ALLOW_DEMO_SEED=1 pnpm --filter @ww/db db:seed` (dev branch only; explicit opt-in, and it
    refuses `NODE_ENV=production`).
-6. `pnpm --filter @ww/db test` — reads `.env`, so the isolation suite also runs live against Neon
+6. `ALLOW_DEMO_SEED=1 pnpm --filter @ww/db seed:rsvp` — wipes and reloads the 8 fake `ana-and-ben`
+   invitations (and every reply on them). Same guards as `db:seed`; touches no other site.
+7. `pnpm --filter @ww/db test` — reads `.env`, so the isolation suite also runs live against Neon
    (otherwise that leg is reported as skipped). It asserts the connection role is not superuser,
    cannot bypass RLS, owns no tables and cannot `SET ROLE` into anything that can. Every write
    probe rolls back, so it is safe against a shared branch. On a dev branch, add
@@ -48,6 +50,7 @@ const theme = await withSite(getPoolDb(), site.id, (tx) => tx.select().from(site
 | `db:generate` | —                      | Diff schema → new SQL migration (never `push`)     |
 | `db:migrate`  | `MIGRATE_DATABASE_URL` | Apply `drizzle/*.sql`                              |
 | `db:seed`     | `MIGRATE_DATABASE_URL` | Idempotent 3-site demo data                        |
+| `seed:rsvp`   | `MIGRATE_DATABASE_URL` | Wipe + reseed demo RSVP parties (`ana-and-ben`)    |
 | `test`        | PGlite (+ Neon)        | Isolation suite; live leg runs when `DATABASE_URL` |
 
 New tenant tables must add their grants + policies in a migration; the app role gets no default

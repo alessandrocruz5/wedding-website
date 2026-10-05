@@ -13,7 +13,8 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx --env-file-if-exists=.env src/seed.ts"
+    "db:seed": "tsx --env-file-if-exists=.env src/seed.ts",
+    "seed:rsvp": "tsx --env-file-if-exists=.env src/seed-rsvp.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
