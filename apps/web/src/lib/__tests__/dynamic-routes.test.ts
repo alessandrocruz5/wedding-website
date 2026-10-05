@@ -7,8 +7,11 @@ import { describe, expect, it } from "vitest";
 const appDir = resolve(__dirname, "../../../app");
 
 describe("env-dependent routes", () => {
-  it.each(["page.tsx", "robots.ts", "sitemap.ts"])("app/%s opts out of static rendering", (file) => {
-    const source = readFileSync(resolve(appDir, file), "utf8");
-    expect(source).toMatch(/^export const dynamic = "force-dynamic";$/m);
-  });
+  it.each(["page.tsx", "robots.ts", "sitemap.ts"])(
+    "app/%s opts out of static rendering",
+    (file) => {
+      const source = readFileSync(resolve(appDir, file), "utf8");
+      expect(source).toMatch(/^export const dynamic = "force-dynamic";$/m);
+    },
+  );
 });
