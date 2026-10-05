@@ -4,7 +4,7 @@ Status: [ ] planned · [~] in progress · [x] merged · [-] cancelled (excluded 
 > Keys below are placeholders (`WW-?n`). Replace each with the real Jira key once the Epic
 > and its children exist in project **WW**.
 
-## Sprint 4 — Portfolio launch polish   (planned 2026-10-06)
+## Sprint 4 — Portfolio launch polish   (planned 2026-10-06) · v0.4.0
 Epic: WW-20
 
 **Locked decisions** (approved 2026-10-06 — do not re-litigate)
@@ -25,7 +25,10 @@ Epic: WW-20
 - [x] WW-21 — Fix localhost URLs in the homepage preview, robots.txt and sitemap · Fixed · files: apps/web/app/{page.tsx,robots.ts,sitemap.ts}, apps/web/src/lib/__tests__/ (new test) · depends: —
   · (merged 2026-10-06, PR #20) `export const dynamic = "force-dynamic"` on `app/page.tsx`, `robots.ts` and `sitemap.ts`, so `ROOT_DOMAIN` is read per request, not at build. The turbo build env is unchanged (WW-7's contract holds). New test `src/lib/__tests__/dynamic-routes.test.ts` guards the three exports.
     - ⚠️ Verify on prod after the deploy: `og:image`, `/robots.txt` and `/sitemap.xml` should show the `*.vercel.app` host, not `localhost:3000`.
-- [ ] WW-22 — Make the RSVP demo usable for visitors and refresh the README · Changed · files: apps/web/src/content/placeholder.ts, apps/web/app/sites/[siteKey]/rsvp/page.tsx, README.md, docs/screenshots/rsvp.png (new), docs/screenshots/* (if changed) · depends: WW-21, owner ops (migration, seed, `DEFAULT_SITE_SLUG`)
+- [x] WW-22 — Make the RSVP demo usable for visitors and refresh the README · Changed · files: apps/web/src/content/placeholder.ts, apps/web/app/sites/[siteKey]/rsvp/page.tsx, README.md, docs/screenshots/rsvp.png (new), docs/screenshots/* (if changed) · depends: WW-21, owner ops (migration, seed, `DEFAULT_SITE_SLUG`)
+  · (merged 2026-10-06, PR #21) RSVP page shows the demo hint (`rsvpHint` in `placeholder.ts`: "Try Maya Santos or Jun Tanaka; use an @example.com email."), on the default site and `/s/ana-and-ben/rsvp`. README: RSVP runs on fake seeded guests under RLS, demo names, `DEFAULT_SITE_SLUG`, public write surface + weekly reseed, isolation count 64 (54 in CI), new `docs/screenshots/rsvp.png`. Gate: CI only.
+    - ⚠️ `rsvp.png` was taken from local Neon `develop` (seeded), not prod; the other 3 screenshots were not re-checked against the live site.
+    - ⚠️ Prod acceptance (find a party and submit on prod) still depends on the owner ops above (migration, `seed:rsvp`, `DEFAULT_SITE_SLUG`).
 
 ## Sprint 3 — Single-couple default view + RSVP demo   (planned 2026-10-05) · v0.3.0
 Epic: WW-14

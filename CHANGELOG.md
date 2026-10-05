@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-06
+
+Sprint 4: portfolio launch polish.
+
+### Changed
+- **WW-22:** the RSVP page shows demo hint copy (names to try, `@example.com` email), and the
+  README now documents the working RSVP demo, `DEFAULT_SITE_SLUG`, the public write surface and
+  the weekly reseed.
+
+### Fixed
+- **WW-21:** homepage preview, `robots.txt` and `sitemap.xml` no longer point at
+  `http://localhost:3000`; the routes are force-dynamic so `ROOT_DOMAIN` is read per request.
+
 ## [0.3.0] - 2026-10-05
 
 Sprint 3: single-couple default view and a working RSVP demo on fake guests.
