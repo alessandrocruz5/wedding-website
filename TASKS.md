@@ -4,7 +4,28 @@ Status: [ ] planned · [~] in progress · [x] merged · [-] cancelled (excluded 
 > Keys below are placeholders (`WW-?n`). Replace each with the real Jira key once the Epic
 > and its children exist in project **WW**.
 
-## Sprint 3 — Single-couple default view + RSVP demo   (planned 2026-10-05)
+## Sprint 4 — Portfolio launch polish   (planned 2026-10-06)
+Epic: WW-20
+
+**Locked decisions** (approved 2026-10-06 — do not re-litigate)
+- Free tiers only, no schema changes, no real guest data. Video demo is out of scope. Branch base is `develop`.
+- Localhost fix: `export const dynamic = "force-dynamic"` on the prerendered routes. Don't add `ROOT_DOMAIN` to the turbo build env; WW-7's "nothing read at build" contract stands.
+- `DEFAULT_SITE_SLUG=ana-and-ben` in Vercel Production (Sprint 3 decision kept): `/` serves Ana & Ben; the 3 demos stay at `/s/{slug}`.
+- Demo replies stay publicly writable (fake data). Reseed weekly by hand; no cron, since it would put owner credentials in CI.
+- Ships v0.4.0 (MINOR) when both units merge.
+
+**Audit baseline (2026-10-05, `origin/main` @ 052e46c):** CI green; Sprint 3 RSVP form deployed. Live `/` `og:image`, `robots.txt` and `sitemap.xml` point at `http://localhost:3000`: `app/{page,robots,sitemap}` are prerendered, so `ROOT_DOMAIN` is read at build, where it's unset. `DEFAULT_SITE_SLUG` not set (`/` = landing, `/rsvp` 404). Prod `0002_rsvp` + `seed:rsvp` not verified. Only `v0.1.0` tagged; CHANGELOG has no `[0.2.0]`.
+
+**Owner ops (no PR, before WW-22's screenshots)**
+- [ ] Commit the v0.3.0 roll-up, backfill CHANGELOG `[0.2.0]`, tag `v0.2.0` at `7992af7` and `v0.3.0` on `main`.
+- [ ] Apply `0002_rsvp` to Neon `prod` and `preview` (owner role, laptop, per runbook); run `ALLOW_DEMO_SEED=1 pnpm --filter @ww/db seed:rsvp` against prod. Verify by looking up "Maya Santos" on `/s/ana-and-ben/rsvp`.
+- [ ] Set `DEFAULT_SITE_SLUG=ana-and-ben` in Vercel Production and redeploy.
+- [ ] Weekly reseed reminder.
+
+- [ ] WW-21 — Fix localhost URLs in the homepage preview, robots.txt and sitemap · Fixed · files: apps/web/app/{page.tsx,robots.ts,sitemap.ts}, apps/web/src/lib/__tests__/ (new test) · depends: —
+- [ ] WW-22 — Make the RSVP demo usable for visitors and refresh the README · Changed · files: apps/web/src/content/placeholder.ts, apps/web/app/sites/[siteKey]/rsvp/page.tsx, README.md, docs/screenshots/rsvp.png (new), docs/screenshots/* (if changed) · depends: WW-21, owner ops (migration, seed, `DEFAULT_SITE_SLUG`)
+
+## Sprint 3 — Single-couple default view + RSVP demo   (planned 2026-10-05) · v0.3.0
 Epic: WW-14
 
 **Locked decisions** (approved 2026-10-05 — do not re-litigate)
@@ -51,7 +72,10 @@ Epic: WW-14
     - **Gate:** CI + code-guardian APPROVE with nits, no Blockers. Its 3 should-fix items were fixed in the PR (site lookup inside the error boundary, a real `updated_at` test, tests for the 23514/23503 mappings). 35 tests run on PGlite with the real migrations as `ww_app`; the isolation tests were mutation-checked.
     - Scope: `apps/web/package.json` and `pnpm-lock.yaml` gained `@electric-sql/pglite` (devDep, approved).
     - ⚠️ **Before real PII (Guest/RSVP sprint):** one exact name reveals the whole party, enough to overwrite its reply. The fixed seed IDs also let anyone overwrite a demo reply without a lookup. No rate limit or invite code yet; this was accepted for fake data under the locked decisions.
-- [ ] WW-19 — Wire the RSVP page and demo script · Added · files: apps/web/app/sites/[siteKey]/rsvp/page.tsx, apps/web/src/content/placeholder.ts, docs/demo-script.md · depends: WW-15, WW-17, WW-18
+- [x] WW-19 — Wire the RSVP page and demo script · Added · files: apps/web/app/sites/[siteKey]/rsvp/page.tsx, apps/web/src/content/placeholder.ts, docs/demo-script.md · depends: WW-15, WW-17, WW-18
+  · (merged 2026-10-05, PR #18) `/rsvp` now runs the real flow: lookup and submit server actions behind a client adapter, meals/events from `placeholder.ts` (`rsvpMeals`, `rsvpEvents`), `replyBy` "August 1, 2027" so the form is open. `docs/demo-script.md` has the names, click path, SQL check and reseed.
+    - Scope: added `apps/web/src/components/rsvp-demo-form.tsx` (the `{ ok: false }` → throw adapter), outside the listed files, approved.
+    - ⚠️ Preview/prod need `0002_rsvp` applied and `seed:rsvp` run before the flow works there.
 
 ## Sprint 2 — Portfolio showcase readiness   (planned 2026-10-04)
 Epic: WW-9
@@ -153,7 +177,9 @@ Epic: WW-?E
 ## Backlog — future sprints (not planned in detail)
 > Renumbered 2026-10-04 when Sprint 2 became the portfolio showcase. "Sprint 2/3/4/5" in the
 > Sprint 1 and WW-3 entries above refer to what is now Sprint 3/4/5/6.
-- Sprint 3 — Content model + public pages (story, schedule, venue/travel, FAQ, registry links) on the imported design system.
-- Sprint 4 — Guest + RSVP: invite codes, party-level RSVP, meals/dietary, plus-ones, confirmation email, rate limiting. Carries the guest-PII constraints.
-- Sprint 5 — Admin: Auth.js v5, membership-scoped authorization, site/theme editing, guest list CRUD + CSV import, RSVP export. ⚠️ high-stakes (auth).
-- Sprint 6 — Media: signed uploads + gallery (storage vendor TBD).
+> Renumbered again 2026-10-06: Sprint 3 became the RSVP demo and Sprint 4 the launch polish, so
+> the content model moved to Sprint 5 and everything after it shifted by two.
+- Sprint 5 — Content model + public pages (story, schedule, venue/travel, FAQ, registry links) on the imported design system.
+- Sprint 6 — Guest + RSVP: invite codes, party-level RSVP, meals/dietary, plus-ones, confirmation email, rate limiting. Carries the guest-PII constraints.
+- Sprint 7 — Admin: Auth.js v5, membership-scoped authorization, site/theme editing, guest list CRUD + CSV import, RSVP export. ⚠️ high-stakes (auth).
+- Sprint 8 — Media: signed uploads + gallery (storage vendor TBD).
