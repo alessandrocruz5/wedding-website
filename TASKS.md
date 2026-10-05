@@ -38,12 +38,19 @@ Epic: WW-14
       - The README doesn't say an email local part can still carry a real address.
       - The Neon setup leaks its pools if the fixture insert throws.
       - Concurrent opted-in live runs on dev collide.
-- [ ] WW-17 — Seed fake invitations and reset · Added · files: packages/db/src/seed.ts (or seed-rsvp.ts), packages/db/package.json, packages/db/README.md · depends: WW-16
+- [x] WW-17 — Seed fake invitations and reset · Added · files: packages/db/src/seed.ts (or seed-rsvp.ts), packages/db/package.json, packages/db/README.md · depends: WW-16
   · (merged 2026-10-05, PR #16) `pnpm --filter @ww/db seed:rsvp` (needs `ALLOW_DEMO_SEED=1`, refuses `NODE_ENV=production`) deletes and recreates 8 fake `ana-and-ben` parties; replies cascade away. Idempotent, other sites and test fixtures untouched.
     - Downstream (WW-19): lookup names are exact-match, e.g. "Maya Santos", "Jun Tanaka"; "Guest of Jun Tanaka" is the plus-one. Party IDs `1a7e0000-…0100`–`0107`, guest IDs `9e570000-…`.
     - Downstream (WW-18): `seedRsvp` / `DEMO_RSVP_PARTY_IDS` are exported from `packages/db/src/seed-rsvp.ts` for tests that need real parties.
     - Test file `src/__tests__/seed-rsvp.test.ts` was added outside the listed files (acceptance required a test).
-- [ ] WW-18 — RSVP server actions · Added · files: apps/web/src/lib/rsvp/{actions,schema}.ts, apps/web/src/lib/rsvp/__tests__/* · depends: WW-16 · ⚠️ guest PII → code-guardian
+- [x] WW-18 — RSVP server actions · Added · files: apps/web/src/lib/rsvp/{actions,schema}.ts, apps/web/src/lib/rsvp/__tests__/* · depends: WW-16 · ⚠️ guest PII → code-guardian
+  · (merged 2026-10-05, PR #17) `lookupInvitation(name)` and `submitRsvp(payload)` server actions. The site comes from the `x-ww-site` header and all DB work runs in `withSite`. Submit upserts one row per invitation with no `RETURNING` and requires the reply to cover exactly the party's guests.
+    - **API (for WW-19):** `lookupInvitation` returns `RsvpLookupResult | null` and plugs straight into `RsvpForm.onLookup`. A name in two parties also returns null. A DB failure throws a generic error, so the form shows its fallback.
+    - **WW-19 needs a client adapter:** `submitRsvp` returns `{ ok: true } | { ok: false; error }` (Next redacts thrown messages in prod). `onSubmit` expects a throw, so wrap it: on `ok: false`, `throw { userMessage: error }`. That needs a small client component, which isn't in WW-19's file list.
+    - **Validation:** strict Zod with caps matching the DB CHECKs. Emails must use reserved domains (hint: `you@example.com`). Option ids are slug-shaped; they aren't checked against the real meal/event lists yet (no content model).
+    - **Gate:** CI + code-guardian APPROVE with nits, no Blockers. Its 3 should-fix items were fixed in the PR (site lookup inside the error boundary, a real `updated_at` test, tests for the 23514/23503 mappings). 35 tests run on PGlite with the real migrations as `ww_app`; the isolation tests were mutation-checked.
+    - Scope: `apps/web/package.json` and `pnpm-lock.yaml` gained `@electric-sql/pglite` (devDep, approved).
+    - ⚠️ **Before real PII (Guest/RSVP sprint):** one exact name reveals the whole party, enough to overwrite its reply. The fixed seed IDs also let anyone overwrite a demo reply without a lookup. No rate limit or invite code yet; this was accepted for fake data under the locked decisions.
 - [ ] WW-19 — Wire the RSVP page and demo script · Added · files: apps/web/app/sites/[siteKey]/rsvp/page.tsx, apps/web/src/content/placeholder.ts, docs/demo-script.md · depends: WW-15, WW-17, WW-18
 
 ## Sprint 2 — Portfolio showcase readiness   (planned 2026-10-04)
