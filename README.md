@@ -170,3 +170,12 @@ app to one site on any host. For RSVP, also run `pnpm --filter @ww/db seed:rsvp`
 ## License
 
 [MIT](LICENSE) © 2026 Alessandro Cruz
+
+### Photo credits
+
+The home hero photos (`apps/web/src/assets/hero/`) are stock photos from Unsplash, used under the
+[Unsplash License](https://unsplash.com/license) and not covered by the MIT licence above:
+
+1. [Brittney Weng](https://unsplash.com/photos/a-bride-and-groom-standing-in-a-field-8AiKV-_QedE): bride and groom in a meadow
+2. [Anna Vi](https://unsplash.com/photos/bride-and-groom-on-green-grass-field-QUi84upBhoc): bride and groom at sunset
+3. [Lukas](https://unsplash.com/photos/a-large-room-with-tables-set-for-a-wedding-eSUXY2puRx0): barn set for dinner

@@ -12,7 +12,7 @@ export default async function RsvpPage({ params }: SitePageProps) {
   const { site, base } = await requireSite(params);
   return (
     <SiteShell names={site.name} base={base} current="rsvp" dateLine={details.dateLine}>
-      <section className="bg-muted px-5 pt-[88px] pb-[120px]">
+      <section className="bg-background px-5 pt-[88px] pb-[120px]">
         <div className="flex flex-col gap-12">
           <SectionHeading
             as="h1"
