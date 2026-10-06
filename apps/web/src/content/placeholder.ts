@@ -3,6 +3,10 @@
  * until Sprint 2's per-site content model replaces this file. Never put real guest data here.
  */
 import type { AccordionItem, BadgeTone, RsvpEvent, RsvpOption } from "@ww/ui";
+import type { StaticImageData } from "next/image";
+import hero1 from "@/assets/hero/1.webp";
+import hero2 from "@/assets/hero/2.webp";
+import hero3 from "@/assets/hero/3.webp";
 
 export const details = {
   dateLine: "October 16, 2027 · Hollis Farm, Hudson Valley",
@@ -28,6 +32,13 @@ export const rsvpMeals: RsvpOption[] = [
 export const rsvpEvents: RsvpEvent[] = [
   { id: "welcome", label: "Welcome drinks", description: "Friday, 7pm · The Orchard Barn" },
   { id: "brunch", label: "Farewell brunch", description: "Sunday, 10am · Main House lawn" },
+];
+
+/** Home hero slides: Unsplash License stock photos, credited in the README. */
+export const heroSlides: { src: StaticImageData; alt: string }[] = [
+  { src: hero1, alt: "A bride and groom standing in a meadow, looking out at wooded hills" },
+  { src: hero2, alt: "A bride and groom embracing in a grassy field at sunset" },
+  { src: hero3, alt: "A rustic barn set for the wedding dinner, with long white tables" },
 ];
 
 export const story =
