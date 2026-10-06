@@ -4,7 +4,7 @@ Status: [ ] planned · [~] in progress · [x] merged · [-] cancelled (excluded 
 > Keys below are placeholders (`WW-?n`). Replace each with the real Jira key once the Epic
 > and its children exist in project **WW**.
 
-## Sprint 5 — Home & RSVP visual refresh   (planned 2026-10-06)
+## Sprint 5 — Home & RSVP visual refresh   (planned 2026-10-06) · v0.5.0
 Epic: WW-23
 
 **Locked decisions** (approved 2026-10-06 — do not re-litigate)
@@ -15,7 +15,10 @@ Epic: WW-23
 - Changes hit the default site and all 3 demos (shared home page). Branch base is `develop`. Ships v0.5.0 (MINOR) when both units merge.
 
 - [x] WW-24 — Sage bands with scallop edges, and RSVP on the page background · Changed · files: apps/web/app/sites/[siteKey]/page.tsx, apps/web/app/sites/[siteKey]/rsvp/page.tsx · depends: — (merged 2026-10-06) — story + CTA bands now scalloped sage; RSVP section on bg-background. No downstream changes.
-- [ ] WW-25 — Full-height hero carousel with crossfade and dim · Changed · files: apps/web/src/components/hero-carousel.tsx (new), apps/web/src/assets/hero/{1,2,3}.webp (new), apps/web/src/components/__tests__/hero-carousel.test.tsx (new), apps/web/app/sites/[siteKey]/page.tsx, apps/web/src/content/placeholder.ts, README.md, docs/screenshots/{landing,demo-*}.png, apps/web/vitest.config.ts (new; scope add approved 2026-10-06: JSX transform + `@/` alias for component tests) · depends: WW-24
+- [x] WW-25 — Full-height hero carousel with crossfade and dim · Changed · files: apps/web/src/components/hero-carousel.tsx (new), apps/web/src/assets/hero/{1,2,3}.webp (new), apps/web/src/components/__tests__/hero-carousel.test.tsx (new), apps/web/app/sites/[siteKey]/page.tsx, apps/web/src/content/placeholder.ts, README.md, docs/screenshots/{landing,demo-*}.png, apps/web/vitest.config.ts (new; scope add approved 2026-10-06: JSX transform + `@/` alias for component tests) · depends: WW-24
+  · (merged 2026-10-06, PR #24) `HeroCarousel` (client): 3 Unsplash WebPs (97–149 KB) crossfade on an 18s CSS loop under a 65% bark dim, with a pause/play button; reduced motion = static first photo, no button. Height is `100svh` minus the measured header (59px ≥`sm`, 94px below). Slides + alt text live in `heroSlides` (`placeholder.ts`); credits in the README. Measured AA on all 3 photos: linen ≥4.65:1, ampersand (clay-light 60% mixed with linen) ≥3.42:1. Demo screenshots refreshed; `landing.png` unchanged (the landing page doesn't render the hero). Gate: CI only.
+    - Downstream: `apps/web` now has `vitest.config.ts`, so component tests can use JSX + `@/`. Files importing images need `/// <reference types="next/image-types/global" />`: CI typechecks before `next build` generates `next-env.d.ts`.
+    - ⚠️ The header offsets are hard-coded: if the nav or the wordmark size changes, re-measure them in `hero-carousel.tsx`.
 
 ## Sprint 4 — Portfolio launch polish   (planned 2026-10-06) · v0.4.0
 Epic: WW-20

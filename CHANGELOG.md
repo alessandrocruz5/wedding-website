@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-06
+
+Sprint 5: home and RSVP visual refresh.
+
+### Changed
+- **WW-24:** the story and RSVP call-to-action bands are sage with scallop edges, and the RSVP
+  section sits on the page background.
+- **WW-25:** the home hero is a full-height photo carousel (3 Unsplash photos crossfading under a
+  dark dim, with light text, a pause button and a static image under reduced motion), replacing
+  the placeholder frames.
+
 ## [0.4.0] - 2026-10-06
 
 Sprint 4: portfolio launch polish.
