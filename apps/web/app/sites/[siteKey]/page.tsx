@@ -70,6 +70,7 @@ export default async function SiteHome({ params }: SitePageProps) {
           </div>
         </div>
       </section>
+      <ArcDivider variant="scallop" color="var(--color-calm)" className="rotate-180" />
 
       <section className="mx-auto box-border flex max-w-content flex-col gap-14 px-6 py-28">
         <SectionHeading
@@ -100,23 +101,20 @@ export default async function SiteHome({ params }: SitePageProps) {
         </div>
       </section>
 
-      <section className="mx-auto box-border max-w-content px-6 pb-28">
-        <div className="flex flex-col items-center gap-[22px] rounded-dome bg-accent px-6 pt-[120px] pb-[72px] text-center text-accent-foreground">
-          <ArcDivider variant="nested" color="var(--color-calm-strong)" />
+      <ArcDivider variant="scallop" color="var(--color-calm)" />
+      <section className="bg-calm px-6 py-20">
+        <div className="mx-auto flex max-w-content flex-col items-center gap-[22px] text-center">
           <SectionHeading
-            inverse
             size="md"
             eyebrow={`Kindly reply by ${details.replyBy}`}
             title="Will you join us?"
           />
-          <Link
-            href={sitePath(base, "rsvp")}
-            className={buttonClasses({ variant: "inverse", size: "lg" })}
-          >
+          <Link href={sitePath(base, "rsvp")} className={buttonClasses({ size: "lg" })}>
             RSVP now
           </Link>
         </div>
       </section>
+      <ArcDivider variant="scallop" color="var(--color-calm)" className="rotate-180" />
     </SiteShell>
   );
 }
