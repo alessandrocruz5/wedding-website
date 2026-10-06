@@ -110,14 +110,23 @@ function SiteFooter({ names, base, dateLine }: Omit<ChromeProps, "current">) {
   );
 }
 
-/** Sticky nav, page content and the bark dome footer around every public site page. */
-export function SiteShell({ children, ...chrome }: ChromeProps & { children: ReactNode }) {
+/**
+ * Sticky nav, page content and the bark dome footer around every public site page.
+ * `footerOnCalm` fills the ground behind the dome with sage, for pages ending on a calm band.
+ */
+export function SiteShell({
+  children,
+  footerOnCalm = false,
+  ...chrome
+}: ChromeProps & { children: ReactNode; footerOnCalm?: boolean }) {
   return (
     <div className="min-h-dvh bg-background">
       <ShowcaseBanner />
       <SiteNav names={chrome.names} base={chrome.base} current={chrome.current} />
       <main>{children}</main>
-      <SiteFooter names={chrome.names} base={chrome.base} dateLine={chrome.dateLine} />
+      <div className={footerOnCalm ? "bg-calm" : undefined}>
+        <SiteFooter names={chrome.names} base={chrome.base} dateLine={chrome.dateLine} />
+      </div>
     </div>
   );
 }

@@ -25,7 +25,14 @@ export default async function TravelPage({ params }: SitePageProps) {
         <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-6">
           {hotels.map((h) => (
             <Card key={h.name} padding={20} className="flex flex-col gap-4">
-              <ArchFrame shape="rounded" aspect={1.7} tone={h.tone} label="Hotel photo" />
+              <ArchFrame
+                shape="rounded"
+                aspect={1.7}
+                tone={h.tone}
+                label="Hotel photo"
+                src={h.photo.src}
+                alt={`${h.name} exterior`}
+              />
               <div className="flex flex-col items-start gap-2.5 px-2 pb-2">
                 <span className="font-heading text-h3">{h.name}</span>
                 <span className="text-[15px] text-ink-soft">{h.meta}</span>
