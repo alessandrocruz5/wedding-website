@@ -2,7 +2,7 @@ import { ArcDivider, ArchFrame, Badge, buttonClasses, Card, Names, SectionHeadin
 import Link from "next/link";
 import { HeroCarousel } from "@/components/hero-carousel";
 import { SiteShell, sitePath } from "@/components/site-chrome";
-import { details, heroSlides, story, weekendEvents } from "@/content/placeholder";
+import { details, heroSlides, story, storyPhoto, weekendEvents } from "@/content/placeholder";
 import { requireSite, type SitePageProps } from "@/lib/site";
 
 const eyebrow = "text-eyebrow font-medium tracking-eyebrow text-primary uppercase";
@@ -50,6 +50,8 @@ export default async function SiteHome({ params }: SitePageProps) {
             inset
             tone="sand"
             label="How we met"
+            src={storyPhoto.src.src}
+            alt={storyPhoto.alt}
             className="max-w-[380px] justify-self-center"
           />
           <div className="flex flex-col gap-[22px]">
