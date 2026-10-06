@@ -4,6 +4,19 @@ Status: [ ] planned · [~] in progress · [x] merged · [-] cancelled (excluded 
 > Keys below are placeholders (`WW-?n`). Replace each with the real Jira key once the Epic
 > and its children exist in project **WW**.
 
+## Sprint 5 — Home & RSVP visual refresh   (planned 2026-10-06)
+Epic: WW-23
+
+**Locked decisions** (approved 2026-10-06 — do not re-litigate)
+- RSVP section uses `bg-background` (#F5EFE6), not `bg-muted` (#EADFCF). The #2E241F mention was a slip.
+- Hero text (eyebrow, names, date, both buttons) stays, on top of the carousel, with a dark dim over every slide; hero text switches to light/inverse colours.
+- Bottom scallops are `ArcDivider variant="scallop"` + `rotate-180` at the call site; no `@ww/ui` change.
+- Photos: 3 free-licence stock (Unsplash) WebP ≤300 KB, imported locally into `next/image`, credited in the README. CSS crossfade + client pause button; static first image under reduced motion. No carousel library.
+- Changes hit the default site and all 3 demos (shared home page). Branch base is `develop`. Ships v0.5.0 (MINOR) when both units merge.
+
+- [ ] WW-24 — Sage bands with scallop edges, and RSVP on the page background · Changed · files: apps/web/app/sites/[siteKey]/page.tsx, apps/web/app/sites/[siteKey]/rsvp/page.tsx · depends: —
+- [ ] WW-25 — Full-height hero carousel with crossfade and dim · Changed · files: apps/web/src/components/hero-carousel.tsx (new), apps/web/src/assets/hero/{1,2,3}.webp (new), apps/web/src/components/__tests__/hero-carousel.test.tsx (new), apps/web/app/sites/[siteKey]/page.tsx, apps/web/src/content/placeholder.ts, README.md, docs/screenshots/{landing,demo-*}.png · depends: WW-24
+
 ## Sprint 4 — Portfolio launch polish   (planned 2026-10-06) · v0.4.0
 Epic: WW-20
 
