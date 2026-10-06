@@ -2,7 +2,7 @@ import { ArcDivider, ArchFrame, Badge, buttonClasses, Card, Names, SectionHeadin
 import Link from "next/link";
 import { HeroCarousel } from "@/components/hero-carousel";
 import { SiteShell, sitePath } from "@/components/site-chrome";
-import { details, heroSlides, story, weekendEvents } from "@/content/placeholder";
+import { details, heroSlides, story, storyPhoto, weekendEvents } from "@/content/placeholder";
 import { requireSite, type SitePageProps } from "@/lib/site";
 
 const eyebrow = "text-eyebrow font-medium tracking-eyebrow text-primary uppercase";
@@ -10,7 +10,13 @@ const eyebrow = "text-eyebrow font-medium tracking-eyebrow text-primary uppercas
 export default async function SiteHome({ params }: SitePageProps) {
   const { site, base } = await requireSite(params);
   return (
-    <SiteShell names={site.name} base={base} current="home" dateLine={details.dateLine}>
+    <SiteShell
+      names={site.name}
+      base={base}
+      current="home"
+      dateLine={details.dateLine}
+      footerOnCalm
+    >
       <HeroCarousel slides={heroSlides}>
         <div className="mx-auto box-border flex max-w-content flex-col items-center gap-[22px] px-6 pt-20 pb-24 text-center text-inverse-foreground">
           <span className="text-eyebrow font-medium tracking-eyebrow uppercase">
@@ -44,6 +50,8 @@ export default async function SiteHome({ params }: SitePageProps) {
             inset
             tone="sand"
             label="How we met"
+            src={storyPhoto.src.src}
+            alt={storyPhoto.alt}
             className="max-w-[380px] justify-self-center"
           />
           <div className="flex flex-col gap-[22px]">
@@ -115,7 +123,6 @@ export default async function SiteHome({ params }: SitePageProps) {
           </Link>
         </div>
       </section>
-      <ArcDivider variant="scallop" color="var(--color-calm)" className="rotate-180" />
     </SiteShell>
   );
 }

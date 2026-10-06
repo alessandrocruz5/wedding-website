@@ -6,9 +6,12 @@
  */
 import type { AccordionItem, BadgeTone, RsvpEvent, RsvpOption } from "@ww/ui";
 import type { StaticImageData } from "next/image";
+import arloHotel from "@/assets/arlo-hotel.webp";
 import hero1 from "@/assets/hero/1.webp";
 import hero2 from "@/assets/hero/2.webp";
 import hero3 from "@/assets/hero/3.webp";
+import millhouseInn from "@/assets/millhouse-inn.webp";
+import ourStory from "@/assets/our-story.webp";
 
 export const details = {
   dateLine: "October 16, 2027 · Hollis Farm, Hudson Valley",
@@ -42,6 +45,11 @@ export const heroSlides: { src: StaticImageData; alt: string }[] = [
   { src: hero2, alt: "A bride and groom embracing in a grassy field at sunset" },
   { src: hero3, alt: "A rustic barn set for the wedding dinner, with long white tables" },
 ];
+
+export const storyPhoto: { src: StaticImageData; alt: string } = {
+  src: ourStory,
+  alt: "The couple together",
+};
 
 export const story =
   "One of us was late for a train; the other had the only umbrella on the platform. Eight years, two cities and one very patient dog later, we’re getting married on the farm where our grandparents did.";
@@ -143,6 +151,7 @@ export const hotels: {
   meta: string;
   badge: string;
   tone: "sand" | "sage";
+  photo: StaticImageData;
   bookingUrl?: string;
 }[] = [
   {
@@ -150,6 +159,7 @@ export const hotels: {
     meta: "12 min from the farm · shuttle stop",
     badge: "Room block · code HOLLIS27",
     tone: "sand",
+    photo: arloHotel,
     bookingUrl: "https://example.com/hotel-arlo",
   },
   {
@@ -157,6 +167,7 @@ export const hotels: {
     meta: "6 min from the farm · walkable to town",
     badge: "Room block · until Sept 1",
     tone: "sage",
+    photo: millhouseInn,
     bookingUrl: "https://example.com/the-millhouse-inn",
   },
 ];
