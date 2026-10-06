@@ -1,3 +1,5 @@
+// Image import types live in next-env.d.ts, which is gitignored and generated after CI typechecks.
+/// <reference types="next/image-types/global" />
 /**
  * SAMPLE CONTENT from the Claude Design kit (WW-3). Every site shows it, under its own names,
  * until Sprint 2's per-site content model replaces this file. Never put real guest data here.
