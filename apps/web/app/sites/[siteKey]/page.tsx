@@ -10,7 +10,13 @@ const eyebrow = "text-eyebrow font-medium tracking-eyebrow text-primary uppercas
 export default async function SiteHome({ params }: SitePageProps) {
   const { site, base } = await requireSite(params);
   return (
-    <SiteShell names={site.name} base={base} current="home" dateLine={details.dateLine}>
+    <SiteShell
+      names={site.name}
+      base={base}
+      current="home"
+      dateLine={details.dateLine}
+      footerOnCalm
+    >
       <HeroCarousel slides={heroSlides}>
         <div className="mx-auto box-border flex max-w-content flex-col items-center gap-[22px] px-6 pt-20 pb-24 text-center text-inverse-foreground">
           <span className="text-eyebrow font-medium tracking-eyebrow uppercase">
@@ -115,7 +121,6 @@ export default async function SiteHome({ params }: SitePageProps) {
           </Link>
         </div>
       </section>
-      <ArcDivider variant="scallop" color="var(--color-calm)" className="rotate-180" />
     </SiteShell>
   );
 }
