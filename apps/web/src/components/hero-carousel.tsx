@@ -1,7 +1,7 @@
 "use client";
 
 import Image, { type StaticImageData } from "next/image";
-import { type ReactNode, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 
 const SLIDE_SECONDS = 6;
 const FADE_SECONDS = 1;
@@ -20,6 +20,23 @@ function crossfadeCss(count: number): string {
 @media (prefers-reduced-motion:reduce){.ww-hero-slide{animation:none}}`;
 }
 
+/**
+ * Reports the sticky header's real height (it wraps to two rows on phones, and grows with the
+ * user's font size) now and on every resize. Returns a cleanup function.
+ */
+export function watchHeaderHeight(
+  header: Element | null,
+  onHeight: (px: number) => void,
+  Observer?: typeof ResizeObserver,
+): () => void {
+  if (!header) return () => {};
+  const read = () => onHeight(Math.round(header.getBoundingClientRect().height));
+  read();
+  const observer = new (Observer ?? ResizeObserver)(read);
+  observer.observe(header);
+  return () => observer.disconnect();
+}
+
 interface HeroCarouselProps {
   slides: { src: StaticImageData; alt: string }[];
   /** The hero text, laid over the dimmed photos. */
@@ -32,9 +49,16 @@ interface HeroCarouselProps {
  */
 export function HeroCarousel({ slides, children }: HeroCarouselProps) {
   const [paused, setPaused] = useState(false);
-  // --ww-header-h is the sticky nav's measured height: it wraps to two rows below `sm`.
+  const [headerH, setHeaderH] = useState<number | null>(null);
+  useEffect(() => watchHeaderHeight(document.querySelector("header"), setHeaderH), []);
+  // --ww-header-h is the sticky nav's height. The classes are the pre-measure fallback (it wraps
+  // to two rows below `sm`); the inline value replaces them once the real header is measured.
+  const style = headerH ? ({ "--ww-header-h": `${headerH}px` } as CSSProperties) : undefined;
   return (
-    <section className="relative isolate flex min-h-[calc(100svh-var(--ww-header-h))] items-center overflow-hidden bg-inverse [--ww-header-h:94px] sm:[--ww-header-h:59px]">
+    <section
+      style={style}
+      className="relative isolate flex min-h-[calc(100svh-var(--ww-header-h))] items-center overflow-hidden bg-inverse [--ww-header-h:94px] sm:[--ww-header-h:59px]"
+    >
       <style>{crossfadeCss(slides.length)}</style>
       <div className="ww-hero absolute inset-0 -z-10" data-paused={paused || undefined}>
         {slides.map((slide, i) => (

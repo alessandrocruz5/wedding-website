@@ -1,5 +1,6 @@
 import { ArcDivider, ArchFrame, Badge, buttonClasses, Card, Names, SectionHeading } from "@ww/ui";
 import Link from "next/link";
+import { Fragment } from "react";
 import { HeroCarousel } from "@/components/hero-carousel";
 import { SiteShell, sitePath } from "@/components/site-chrome";
 import { details, heroSlides, story, storyPhoto, weekendEvents } from "@/content/placeholder";
@@ -26,14 +27,29 @@ export default async function SiteHome({ params }: SitePageProps) {
           <h1 className="m-0 font-normal [&_em]:text-[color-mix(in_srgb,var(--color-clay-light)_60%,var(--color-inverse-foreground))]">
             <Names names={site.name} className="text-display-xl" />
           </h1>
-          <span className="text-body-lg font-light">{details.dateLine}</span>
-          <div className="mt-1.5 flex flex-wrap justify-center gap-3">
-            <Link href={sitePath(base, "rsvp")} className={buttonClasses({ size: "lg" })}>
+          <span className="text-body-lg font-light">
+            {details.dateLine.split(" · ").map((part, i) => (
+              <Fragment key={part}>
+                {i > 0 ? (
+                  <>
+                    <span className="max-sm:hidden"> · </span>
+                    <br className="sm:hidden" />
+                  </>
+                ) : null}
+                {part}
+              </Fragment>
+            ))}
+          </span>
+          <div className="mt-1.5 flex w-full flex-wrap justify-center gap-3 max-sm:flex-col max-sm:items-center">
+            <Link
+              href={sitePath(base, "rsvp")}
+              className={`${buttonClasses({ size: "lg" })} max-sm:w-full max-sm:max-w-xs`}
+            >
               RSVP by {details.replyBy}
             </Link>
             <Link
               href={sitePath(base, "schedule")}
-              className={buttonClasses({ size: "lg", variant: "inverse" })}
+              className={`${buttonClasses({ size: "lg", variant: "inverse" })} max-sm:w-full max-sm:max-w-xs`}
             >
               The weekend
             </Link>
