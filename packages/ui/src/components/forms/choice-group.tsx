@@ -118,7 +118,7 @@ function ChoiceItem({
       <label
         className={cx(
           itemBase,
-          "flex min-h-[210px] flex-col items-center justify-end gap-1.5 rounded-arch-soft px-[18px] pt-11 pb-[26px] text-center",
+          "flex min-h-[210px] flex-col items-center justify-end gap-1.5 rounded-arch-soft px-3 pt-11 pb-[26px] text-center sm:px-[18px]",
           checked
             ? "border-accent bg-accent text-accent-foreground"
             : "border-border bg-surface text-foreground hover:border-ink-soft",
@@ -134,7 +134,9 @@ function ChoiceItem({
         >
           {checked ? <span className="size-3 rounded-full bg-accent-foreground" /> : null}
         </span>
-        <span className="font-heading text-[27px] leading-[1.1] italic">{option.label}</span>
+        <span className="font-heading text-[clamp(19px,5.6vw,27px)] leading-[1.1] break-words italic">
+          {option.label}
+        </span>
         {option.description ? (
           <span
             className={cx(
