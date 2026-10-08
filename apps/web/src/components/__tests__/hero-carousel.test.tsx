@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { heroSlides } from "@/content/placeholder";
-import { HeroCarousel } from "../hero-carousel";
+import { HeroCarousel, watchHeaderHeight } from "../hero-carousel";
 
 describe("HeroCarousel", () => {
   const html = renderToStaticMarkup(
@@ -35,5 +35,44 @@ describe("HeroCarousel", () => {
     expect(html).toContain(
       "@media (prefers-reduced-motion:reduce){.ww-hero-slide{animation:none}}",
     );
+  });
+
+  it("keeps the 94px / 59px header fallback before measuring", () => {
+    expect(html).toContain("[--ww-header-h:94px]");
+    expect(html).toContain("sm:[--ww-header-h:59px]");
+    expect(html).not.toContain('style="--ww-header-h');
+  });
+
+  it("measures the real header height and keeps observing it", () => {
+    let notify = () => {};
+    const disconnect = vi.fn();
+    class FakeObserver {
+      constructor(cb: () => void) {
+        notify = cb;
+      }
+      observe = vi.fn();
+      disconnect = disconnect;
+    }
+    let height = 107.6;
+    const header = { getBoundingClientRect: () => ({ height }) } as unknown as Element;
+    const onHeight = vi.fn();
+
+    const stop = watchHeaderHeight(
+      header,
+      onHeight,
+      FakeObserver as unknown as typeof ResizeObserver,
+    );
+    expect(onHeight).toHaveBeenLastCalledWith(108);
+    height = 120;
+    notify();
+    expect(onHeight).toHaveBeenLastCalledWith(120);
+    stop();
+    expect(disconnect).toHaveBeenCalled();
+  });
+
+  it("does nothing when there is no header", () => {
+    const onHeight = vi.fn();
+    watchHeaderHeight(null, onHeight)();
+    expect(onHeight).not.toHaveBeenCalled();
   });
 });

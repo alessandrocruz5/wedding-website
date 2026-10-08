@@ -193,6 +193,11 @@ Epic: WW-?E
   - ⚠️ **Follow-ups:** all three seeded demo sites use a placeholder preset (`classic`/`garden`/`modern`), so none shows the default Arc & Hearth palette. The presets should be re-tuned as earth-tone variants, or a demo site should seed `default`. The inverse eyebrow (`clay-light`) is faint on the presets' light accents. The hotels have no `bookingUrl` in the sample, so the "Book a room" link is hidden. Sprint 2 replaces `content/placeholder.ts`.
 
 ## Hotfixes
+- [ ] WW-26 — Fix mobile layout: RSVP arch overflow and home hero fit · Fixed · files: packages/ui/src/components/forms/choice-group.tsx, apps/web/src/components/hero-carousel.tsx, apps/web/src/components/__tests__/hero-carousel.test.tsx, apps/web/app/sites/[siteKey]/page.tsx, apps/web/app/sites/[siteKey]/rsvp/page.tsx (only if needed) · depends: — · (planned 2026-10-08, branch `bugfix-mobile-view`, ships v0.5.1)
+  - Arch labels: fluid size + `px-3 sm:px-[18px]` + `break-words`; 1-col below 360px only as fallback. Only caller is `rsvp-form.tsx`.
+  - Hero: `ResizeObserver` on the sticky `header` sets `--ww-header-h` (keep 94/59px as SSR fallback). Phone header measured ~108px vs hard-coded 94px.
+  - Hero date line breaks at " · " below `sm` (don't change `details.dateLine`; footer uses it). Buttons `max-sm:flex-col`, `w-full max-w-xs`.
+  - Fold `bugfix-colors` (PR #26, no changelog entry) into the v0.5.1 CHANGELOG entry.
 - [x] WW-hotfix — Untrack committed `packages/*/node_modules` · Fixed · files: packages/{config,db,env}/node_modules/** (47 files removed from the index) · depends: — · (committed 2026-10-02 straight to `develop`, ships in v0.1.0) `.gitignore` was already fixed in 3430de4 (unanchored `node_modules`), but files that were already tracked stayed tracked. Caused the junk-only PR #5. No Jira key yet.
 
 ## Backlog — future sprints (not planned in detail)
