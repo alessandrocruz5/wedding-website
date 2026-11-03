@@ -4,22 +4,6 @@ A multi-tenant platform that serves many couples' wedding sites from **one codeb
 database**. Each site has its own theme, domain and content, and isolation between couples is
 enforced by Postgres, not by application code. The same app also runs as a single-client deploy.
 
-**Live demo: <https://wedding-website-gamma-teal-87.vercel.app>**
-
-| Demo                                                                            | Preset    |
-| ------------------------------------------------------------------------------- | --------- |
-| [Ana & Ben](https://wedding-website-gamma-teal-87.vercel.app/s/ana-and-ben)     | `classic` |
-| [Carla & Dan](https://wedding-website-gamma-teal-87.vercel.app/s/carla-and-dan) | `garden`  |
-| [Eli & Faye](https://wedding-website-gamma-teal-87.vercel.app/s/eli-and-faye)   | `modern`  |
-
-The three demos are the same components with different per-site theme tokens.
-
-![Platform landing page](docs/screenshots/landing.png)
-
-|                                                          |                                                          |                                                         |
-| -------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------- |
-| ![Ana & Ben, classic](docs/screenshots/demo-classic.png) | ![Carla & Dan, garden](docs/screenshots/demo-garden.png) | ![Eli & Faye, modern](docs/screenshots/demo-modern.png) |
-
 This is a portfolio project on free tiers (Vercel Hobby + Neon). The homepage serves Ana & Ben
 (`DEFAULT_SITE_SLUG=ana-and-ben`); the three demos stay at `/s/{slug}`. Subdomain and
 custom-domain routing is implemented and tested, and only needs a domain to go live.
