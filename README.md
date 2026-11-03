@@ -1,12 +1,10 @@
-# Whitelabel wedding sites
-
-A multi-tenant platform that serves many couples' wedding sites from **one codebase and one
-database**. Each site has its own theme, domain and content, and isolation between couples is
-enforced by Postgres, not by application code. The same app also runs as a single-client deploy.
+# Ana & Ben Wedding Website
 
 This is a portfolio project on free tiers (Vercel Hobby + Neon). The homepage serves Ana & Ben
 (`DEFAULT_SITE_SLUG=ana-and-ben`); the three demos stay at `/s/{slug}`. Subdomain and
 custom-domain routing is implemented and tested, and only needs a domain to go live.
+
+https://wedding-website-gamma-teal-87.vercel.app/
 
 ### Try the RSVP
 
